@@ -1,0 +1,10 @@
+autogen-agentchat
+autogen-ext[openai]
+openai
+faiss-cpu
+numpy
+streamlit
+python-dotenv
+pandas
+openpyxl
+pypdf
