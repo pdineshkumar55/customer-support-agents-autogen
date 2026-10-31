@@ -139,6 +139,7 @@ The FAISS index is built automatically on the first search and saved to `faiss_i
 **Optional command-line tests:**
 
 ```bash
+python check_setup.py    # check the model and faiss setup done.
 python test_kb.py        # retrieval scores for the 6 test complaints
 python test_log.py       # escalation rule + CSV (no LLM calls)
 python test_team.py      # all 6 complaints through the full team
