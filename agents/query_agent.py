@@ -10,7 +10,10 @@ CATEGORY: <one of: Shipping, Refund, Account, Product, Billing, Other>
 URGENCY: <Low, Medium or High>
 SENTIMENT: <Positive, Neutral, Frustrated or Angry>
 FLAGS: <comma-separated from: legal_threat, fraud, payment_dispute — or none>
-SUMMARY: <one short sentence describing the problem>
+SUMMARY: <one short sentence describing the problem, always in English>
+LANGUAGE: <the language the customer wrote in, e.g. English, Tamil, Hindi.
+          If they wrote a non-English language in English letters, add "(Latin script)",
+          e.g. "Tamil (Latin script)">
 
 Urgency guide:
 - High: money charged wrongly, fraud or hacked account, legal threats, safety risk,
@@ -31,7 +34,7 @@ Product = defects, warranty, product questions. Other = anything not covered abo
 def create_query_agent(model_client) -> AssistantAgent:
     return AssistantAgent(
         name="query_agent",
-        description="Reads the complaint and extracts category, urgency, sentiment and a summary.",
+        description="Reads the complaint and extracts category, urgency, sentiment, language and a summary.",
         model_client=model_client,
         system_message=SYSTEM_MESSAGE,
     )

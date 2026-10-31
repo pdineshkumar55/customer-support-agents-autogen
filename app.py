@@ -10,6 +10,7 @@ import streamlit as st
 from autogen_agentchat.base import TaskResult
 
 from agents.log_agent import LOG_FILE
+from dashboard import render_dashboard
 from llm import get_model_client
 from team import build_task, create_team
 
@@ -30,6 +31,9 @@ SAMPLES = {
     "Broken blender": ("Karthik", "ORD-2290", "The blender I received is broken. Can I get a replacement?"),
     "Charged 3 times": ("Ravi", "ORD-1187", "You charged my card three times! Fix this now or I'm contacting my bank and a lawyer."),
     "Corporate gift cards": ("Divya", "", "Do you sell gift cards for a company of 500 employees with custom branding?"),
+    "Tamil: broken blender": ("Karthik", "ORD-2290", "நான் வாங்கிய பிளெண்டர் உடைந்த நிலையில் வந்தது. எனக்கு மாற்றுப் பொருள் கிடைக்குமா?"),
+    "Hindi: forgot password": ("Anita", "", "मैं अपना पासवर्ड भूल गई हूँ और लॉगिन नहीं कर पा रही हूँ।"),
+    "Tanglish: late order": ("Selvi", "ORD-5120", "En order innum varala, nethu vandhurum nu sonninga. Enna aachu?"),
 }
 
 st.markdown("""
@@ -99,7 +103,7 @@ with st.sidebar:
 
 # ---------- main ----------
 st.title("AI Customer Support Desk")
-tab_new, tab_log = st.tabs(["📝 New Ticket", "📋 Ticket Log"])
+tab_new, tab_log, tab_dash = st.tabs(["📝 New Ticket", "📋 Ticket Log", "📊 Dashboard"])
 
 with tab_new:
     sample = st.selectbox("Load a sample complaint (optional)", list(SAMPLES))
@@ -144,7 +148,8 @@ with tab_new:
                 if status == "Escalated":
                     st.markdown(f"**Reason:** {last['escalation_reason']}")
                 chips = [("Category", last["category"]), ("Urgency", last["urgency"]),
-                         ("Sentiment", last["sentiment"]), ("Confidence", confidence)]
+                         ("Sentiment", last["sentiment"]), ("Confidence", confidence),
+                         ("Language", last.get("language", "English"))]
                 st.markdown(" ".join(f'<span class="chip"><b>{k}:</b> {v}</span>' for k, v in chips),
                             unsafe_allow_html=True)
                 st.caption(f"📄 Sources: {last['kb_sources']}")
@@ -174,3 +179,6 @@ with tab_log:
         st.download_button("⬇️ Download log (CSV)",
                            data=log.to_csv(index=False).encode("utf-8-sig"),
                            file_name="tickets.csv", mime="text/csv")
+
+with tab_dash:
+    render_dashboard(load_log())

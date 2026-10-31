@@ -1,5 +1,5 @@
-﻿ticket_id,timestamp,customer_name,order_id,complaint,category,urgency,sentiment,flags,kb_sources,response,confidence,status,escalation_reason
-TKT-0001,2026-10-31 18:45:47,Priya,ORD-4512,Where is my order? It was supposed to arrive yesterday.,Shipping,Medium,Frustrated,none,shipping_policy.pdf,"Hi Priya,
+﻿ticket_id,timestamp,customer_name,order_id,complaint,category,urgency,sentiment,language,flags,kb_sources,response,confidence,status,escalation_reason
+TKT-0001,2026-10-31 18:45:47,Priya,ORD-4512,Where is my order? It was supposed to arrive yesterday.,Shipping,Medium,Frustrated,English,none,shipping_policy.pdf,"Hi Priya,
 
 I understand your frustration regarding the delay of your order (ORD-4512). According to our shipping policy, a delivery is considered late if it has not arrived 2 working days after the estimated delivery date. 
 
@@ -9,7 +9,7 @@ Here are the steps you can take:
 2. If your order is still not delivered 2 working days after the estimated date, please contact support again with your order ID, and we will raise a trace request with the courier.
 
 Thank you for your patience.",Medium,Resolved,
-TKT-0002,2026-10-31 18:52:38,Priya,ORD-4512,Where is my order? It was supposed to arrive yesterday.,Shipping,Medium,Frustrated,none,shipping_policy.pdf,"Hi Priya,
+TKT-0002,2026-10-31 18:52:38,Priya,ORD-4512,Where is my order? It was supposed to arrive yesterday.,Shipping,Medium,Frustrated,English,none,shipping_policy.pdf,"Hi Priya,
 
 I understand your frustration regarding the delay of your order (ORD-4512). According to our shipping policy, a delivery is considered late if it has not arrived 2 working days after the estimated delivery date. 
 
@@ -19,7 +19,7 @@ Here are the steps you can take:
 2. If your order is still not delivered after 2 working days, please contact support again with your order ID, and we will raise a trace request with the courier.
 
 Thank you for your patience, and I hope your order arrives soon!",Medium,Resolved,
-TKT-0003,2026-10-31 18:53:22,Ravi,ORD-1187,You charged my card three times! Fix this now or I'm contacting my bank and a lawyer.,Billing,High,Angry,"legal_threat, payment_dispute",refund_policy.pdf,"Dear Ravi,
+TKT-0003,2026-10-31 18:53:22,Ravi,ORD-1187,You charged my card three times! Fix this now or I'm contacting my bank and a lawyer.,Billing,High,Angry,English,"legal_threat, payment_dispute",refund_policy.pdf,"Dear Ravi,
 
 I understand your frustration regarding the multiple charges on your card. Please know that this matter is taken seriously. To address your concern, I recommend the following steps:
 
@@ -27,17 +27,17 @@ I understand your frustration regarding the multiple charges on your card. Pleas
 2. Contact our support team with your Order ID (ORD-1187) and the screenshot.
 
 A billing specialist will review your case urgently. I appreciate your patience as we work to resolve this issue.",Low,Escalated,High urgency + Angry customer + Legal threat + Payment dispute + Low confidence
-TKT-0004,2026-10-31 18:55:12,Divya,N/A,Do you sell gift cards for a company of 500 employees with custom branding?,Other,Low,Neutral,none,NONE,"Hi Divya,
+TKT-0004,2026-10-31 18:55:12,Divya,N/A,Do you sell gift cards for a company of 500 employees with custom branding?,Other,Low,Neutral,English,none,NONE,"Hi Divya,
 
 Thank you for your inquiry about gift cards with custom branding for your company. Unfortunately, I don't have specific information regarding this request. A member of our support team will reach out to you shortly to assist you further.
 
 Best regards,",Low,Escalated,No matching document + Low confidence
-TKT-0005,2026-10-31 18:55:46,Karthik,ORD-2290,The blender I received is broken. Can I get a replacement?,Product,Medium,Frustrated,none,NONE,"Dear Karthik,
+TKT-0005,2026-10-31 18:55:46,Karthik,ORD-2290,The blender I received is broken. Can I get a replacement?,Product,Medium,Frustrated,English,none,NONE,"Dear Karthik,
 
 I’m sorry to hear that the blender you received is broken. Unfortunately, I don’t have specific information regarding replacements. However, a member of our support team will reach out to you shortly to assist with your request.
 
 Thank you for your patience.",Low,Escalated,No matching document + Low confidence
-TKT-0006,2026-10-31 19:00:12,Karthik,ORD-2290,The blender I received is broken. Can I get a replacement?,Product,Medium,Frustrated,none,"product_faq.pdf, refund_policy.pdf","Hi Karthik,
+TKT-0006,2026-10-31 19:00:12,Karthik,ORD-2290,The blender I received is broken. Can I get a replacement?,Product,Medium,Frustrated,English,none,"product_faq.pdf, refund_policy.pdf","Hi Karthik,
 
 I'm sorry to hear that your blender arrived broken. To request a replacement, please follow these steps:
 
@@ -49,7 +49,7 @@ I'm sorry to hear that your blender arrived broken. To request a replacement, pl
 If you do this within the return window of 10 days, you will be eligible for a free replacement. If the item is out of stock, a full refund will be issued.
 
 Thank you for your understanding!",High,Resolved,
-TKT-0007,2026-10-31 19:02:41,Karthik,ORD-2290,The blender I received is broken. Can I get a replacement?,Product,Medium,Frustrated,none,"product_faq.pdf, refund_policy.pdf","Hi Karthik,
+TKT-0007,2026-10-31 19:02:41,Karthik,ORD-2290,The blender I received is broken. Can I get a replacement?,Product,Medium,Frustrated,English,none,"product_faq.pdf, refund_policy.pdf","Hi Karthik,
 
 I'm sorry to hear that your blender arrived broken. To request a replacement, please follow these steps:
 
@@ -61,7 +61,7 @@ I'm sorry to hear that your blender arrived broken. To request a replacement, pl
 If you do this within the return window of 10 days, you will be able to get a free replacement. If the item is out of stock, a full refund will be issued.
 
 Thank you for your understanding!",High,Resolved,
-TKT-0008,2026-10-31 19:17:26,Ravi,ORD-1187,You charged my card three times! Fix this now or I'm contacting my bank and a lawyer.,Billing,High,Angry,"legal_threat, payment_dispute","refund_policy.pdf, shipping_policy.pdf","Dear Ravi,
+TKT-0008,2026-10-31 19:17:26,Ravi,ORD-1187,You charged my card three times! Fix this now or I'm contacting my bank and a lawyer.,Billing,High,Angry,English,"legal_threat, payment_dispute","refund_policy.pdf, shipping_policy.pdf","Dear Ravi,
 
 I understand your frustration regarding the multiple charges on your card. Please know that this matter is taken seriously. To address your concern, I recommend the following steps:
 
@@ -69,7 +69,7 @@ I understand your frustration regarding the multiple charges on your card. Pleas
 2. Contact our support team with your Order ID (ORD-1187) and the screenshot.
 
 A specialist from our Billing team will review your case urgently. I appreciate your patience as we work to resolve this issue.",Low,Escalated,High urgency + Angry customer + Legal threat + Payment dispute + Low confidence
-TKT-0009,2026-10-31 19:18:57,Arjun,ORD-3301,I want to return the shoes I bought last week. How do I get a refund?,Refund,Low,Neutral,none,refund_policy.pdf,"Hi Arjun,
+TKT-0009,2026-10-31 19:18:57,Arjun,ORD-3301,I want to return the shoes I bought last week. How do I get a refund?,Refund,Low,Neutral,English,none,refund_policy.pdf,"Hi Arjun,
 
 To return the shoes you purchased, please follow these steps:
 
@@ -81,7 +81,7 @@ To return the shoes you purchased, please follow these steps:
 Please ensure the shoes are unused, unwashed, and in their original packaging with all tags and accessories. The return pickup is free, and you have 15 days from delivery to initiate the return.
 
 If you have any further questions, feel free to ask!",High,Resolved,
-TKT-0010,2026-10-31 19:19:19,Meena,N/A,I forgot my password and can't log in.,Account,Medium,Neutral,none,account_and_login.pdf,"Hi Meena,
+TKT-0010,2026-10-31 19:19:19,Meena,N/A,I forgot my password and can't log in.,Account,Medium,Neutral,English,none,account_and_login.pdf,"Hi Meena,
 
 To reset your password, please follow these steps:
 
@@ -94,7 +94,7 @@ To reset your password, please follow these steps:
 If you don't receive the reset email within 5 minutes, please check your Spam/Promotions folder and request a new link if necessary.
 
 Let me know if you need further assistance!",High,Resolved,
-TKT-0011,2026-10-31 19:19:41,Priya,ORD-4512,Where is my order? It was supposed to arrive yesterday.,Shipping,Medium,Frustrated,none,shipping_policy.pdf,"Hi Priya,
+TKT-0011,2026-10-31 19:19:41,Priya,ORD-4512,Where is my order? It was supposed to arrive yesterday.,Shipping,Medium,Frustrated,English,none,shipping_policy.pdf,"Hi Priya,
 
 I understand your frustration regarding the delay of your order (ORD-4512). According to our shipping policy, a delivery is considered late if it has not arrived 2 working days after the estimated delivery date. 
 
@@ -104,7 +104,7 @@ Here are the steps you can take:
 2. If your order is still not delivered 2 working days after the estimated date, please contact support again with your order ID. We will then raise a trace request with the courier.
 
 Thank you for your patience, and I hope your order arrives soon!",High,Resolved,
-TKT-0012,2026-10-31 19:20:49,Dinesh,N/A,"I want to change my delivery address, the order hasn’t shipped yet",Shipping,Medium,Neutral,none,shipping_policy.pdf,"Hi Dinesh,
+TKT-0012,2026-10-31 19:20:49,Dinesh,N/A,"I want to change my delivery address, the order hasn’t shipped yet",Shipping,Medium,Neutral,English,none,shipping_policy.pdf,"Hi Dinesh,
 
 You can change your delivery address by following these steps:
 
@@ -117,7 +117,7 @@ Please ensure you do this before the order is dispatched, as changes cannot be m
 
 Best regards,  
 ShopNest Support Team",High,Resolved,
-TKT-0013,2026-10-31 19:22:00,Dinesh,N/A,Someone placed 2 orders from my account that I didn’t make,Account,High,Frustrated,fraud,"account_and_login.pdf, refund_policy.pdf","Dear Dinesh,
+TKT-0013,2026-10-31 19:22:00,Dinesh,N/A,Someone placed 2 orders from my account that I didn’t make,Account,High,Frustrated,English,fraud,"account_and_login.pdf, refund_policy.pdf","Dear Dinesh,
 
 I'm sorry to hear about the unauthorized orders placed from your account. Please follow these steps to address the issue:
 
@@ -127,3 +127,29 @@ I'm sorry to hear about the unauthorized orders placed from your account. Please
 A specialist from our Trust and Safety team will review your case urgently. They may temporarily freeze your account while investigating the matter.
 
 Thank you for your understanding, and we are here to help you.",Low,Escalated,High urgency + Possible fraud + Low confidence
+TKT-0014,2026-10-31 20:38:33,Karthik,ORD-2290,நான் வாங்கிய பிளெண்டர் உடைந்த நிலையில் வந்தது. எனக்கு மாற்றுப் பொருள் கிடைக்குமா?,Product,Medium,Frustrated,Tamil (Latin script),none,"product_faq.pdf, refund_policy.pdf","வணக்கம் கார்த்திக், 
+
+உங்கள் பிளெண்டர் உடைந்த நிலையில் வந்ததற்காக வருந்துகிறேன். மாற்றுப் பொருள் பெற, கீழ்காணும் படிகளை பின்பற்றவும்:
+
+1. உங்கள் கணக்கில் 'My Orders' சென்று, உங்கள் ஆர்டரை தேர்ந்தெடுக்கவும்.
+2. 'Return or Replace' என்பதை கிளிக் செய்யவும்.
+3. 'Damaged' அல்லது 'Defective' என்ற காரணத்தை தேர்ந்தெடுக்கவும்.
+4. புகைப்படங்கள் அல்லது குறுகிய வீடியோவை பதிவேற்றவும்.
+
+இந்த செயல்முறை 10 நாட்களுக்குள் செய்ய வேண்டும். உங்கள் உதவிக்கு நன்றி!",High,Resolved,
+TKT-0015,2026-10-31 20:39:19,Selvi,ORD-5120,"En order innum varala, nethu vandhurum nu sonninga. Enna aachu?",Shipping,Medium,Frustrated,Tamil (Latin script),none,"shipping_policy.pdf, refund_policy.pdf","Selvi, ennaiyum ungal order ORD-5120 varala enbathu kandu pidikkum. Ungal order, estimated delivery date-kku 2 working days munnadi varavillaiyena, adhaiyum check pannunga. Tracking page-la courier updates irukkum.
+
+Idhuvum varalaanaal, support-kku contact pannunga. Neenga order ID solli, trace request raise pannuvom. Courier confirm panninaal parcel lost aanaal, neenga free of charge re-ship seyyalaam illa full refund kidaikkum.
+
+Ungal patience-kku nandri!",Medium,Resolved,
+TKT-0016,2026-10-31 20:41:59,Karthik,ORD-2290,நான் வாங்கிய பிளெண்டர் உடைந்த நிலையில் வந்தது. எனக்கு மாற்றுப் பொருள் கிடைக்குமா?,Product,Medium,Frustrated,Tamil (Latin script),none,"product_faq.pdf, refund_policy.pdf","வணக்கம் கார்த்திக், 
+
+உங்கள் பிளெண்டர் உடைந்த நிலையில் வந்ததற்காக வருந்துகிறேன். மாற்றுப் பொருள் பெற, கீழ்காணும் படிகளை பின்பற்றவும்:
+
+1. உங்கள் கணக்கில் 'My Orders' சென்று, உங்கள் ஆர்டரை தேர்ந்தெடுக்கவும்.
+2. 'Return or Replace' என்பதை கிளிக் செய்யவும்.
+3. 'Damaged' அல்லது 'Defective' என்ற காரணத்தை தேர்ந்தெடுக்கவும்.
+4. புகைப்படங்கள் அல்லது குறுகிய வீடியோவை பதிவேற்றவும்.
+
+இந்த செயல்முறை 10 நாட்களுக்குள் செய்ய வேண்டும். உங்கள் உதவிக்கு நன்றி!",High,Resolved,
+TKT-0017,2026-10-31 20:45:17,Karthik,ORD-2290,ennoda order ku innum invoice and warrenty card varla. enaku anupa mudiyuma?,Product,Medium,Frustrated,Tamil (Latin script),none,"product_faq.pdf, shipping_policy.pdf","Karthik, ennoda order ku invoice matrum warranty card varavillai enbathu unmai. Neenga 'My Orders' la irundhu invoice-a download pannikalaam. Warranty card kidaikkum enbathu order delivery kooda irukkum. Neenga order tracking page-a paarththu, delivery updates pathi therinjikalaam. Order estimated date-kum 2 working days kooda varalaana, support team-kku contact pannunga. Ungal order ID ORD-2290 use pannunga.",Medium,Resolved,

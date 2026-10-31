@@ -8,7 +8,7 @@ from autogen_agentchat.agents import AssistantAgent
 LOG_FILE = Path("logs") / "tickets.csv"
 COLUMNS = [
     "ticket_id", "timestamp", "customer_name", "order_id", "complaint",
-    "category", "urgency", "sentiment", "flags", "kb_sources",
+    "category", "urgency", "sentiment", "language", "flags", "kb_sources",
     "response", "confidence", "status", "escalation_reason",
 ]
 
@@ -39,6 +39,24 @@ def decide_escalation(urgency: str, sentiment: str, flags: str,
     return "Resolved", ""
 
 
+def _upgrade_log_columns() -> None:
+    """If the log was created before a new column was added, rewrite it with the new header."""
+    if not LOG_FILE.exists():
+        return
+    with LOG_FILE.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames == COLUMNS:
+            return
+        rows = list(reader)
+    with LOG_FILE.open("w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=COLUMNS, restval="")
+        writer.writeheader()
+        for row in rows:
+            # old tickets had no language column; they were all English
+            writer.writerow({c: row.get(c) or ("English" if c == "language" else "")
+                             for c in COLUMNS})
+
+
 def _next_ticket_id() -> str:
     """TKT-0001, TKT-0002, ... based on how many rows are already in the log."""
     if not LOG_FILE.exists():
@@ -58,11 +76,13 @@ def log_ticket(
     kb_sources: str,
     response: str,
     confidence: str,
+    language: str = "English",
     customer_name: str = "N/A",
     order_id: str = "N/A",
 ) -> str:
     """Save one support ticket to the log file and decide if it must be escalated
     to human support. Returns the ticket ID, status and escalation reason."""
+    _upgrade_log_columns()
     status, reason = decide_escalation(urgency, sentiment, flags, kb_sources, confidence)
     row = {
         "ticket_id": _next_ticket_id(),
@@ -73,6 +93,7 @@ def log_ticket(
         "category": category,
         "urgency": urgency,
         "sentiment": sentiment,
+        "language": language,
         "flags": flags,
         "kb_sources": kb_sources,
         "response": response,
@@ -99,7 +120,7 @@ Your ONLY job is to record the ticket. Do not change or rewrite anything.
 
 1. Call the log_ticket tool ONCE. Copy the values exactly from the conversation:
    - complaint, customer_name, order_id: from the original task (use "N/A" if missing)
-   - category, urgency, sentiment, flags: from the query_agent
+   - category, urgency, sentiment, flags, language: from the query_agent
    - kb_sources: from the knowledge_agent's KB_SOURCES line (NONE if none)
    - response: the full text under REPLY from the resolution_agent
    - confidence: from the resolution_agent's CONFIDENCE line

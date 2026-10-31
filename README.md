@@ -17,6 +17,8 @@ Built for the **Social Eagle AI Engineering Program — Multi-Agent Systems Trac
 - **Rule-based escalation** applied in Python, so it is the same every time
 - **CSV ticket log** with every column required by the assignment
 - **Streamlit UI:** live agent timeline, green/red status badge, highlighted reply, log viewer with download
+- **📊 Dashboard** *(bonus)*: headline numbers, tickets per category (resolved vs escalated), urgency mix, and why tickets were escalated
+- **🌐 Replies in the customer's language** *(bonus)*: detects English, Tamil, Hindi, Tanglish and more, searches the English documents in English, and replies in the customer's own language and script
 
 ---
 
@@ -24,10 +26,10 @@ Built for the **Social Eagle AI Engineering Program — Multi-Agent Systems Trac
 
 ```mermaid
 flowchart LR
-    U[Customer complaint<br/>Streamlit form] --> Q[🔍 Query Agent<br/>category · urgency · sentiment · flags]
-    Q --> K[📚 Knowledge Agent<br/>search_kb tool]
+    U[Customer complaint<br/>any language] --> Q[🔍 Query Agent<br/>category · urgency · sentiment · flags · language]
+    Q --> K[📚 Knowledge Agent<br/>search_kb tool · English query]
     K <--> F[(FAISS index<br/>4 policy PDFs)]
-    K --> R[✍️ Resolution Agent<br/>grounded reply + confidence]
+    K --> R[✍️ Resolution Agent<br/>grounded reply in customer's language]
     R --> L[🗂️ Log Agent<br/>log_ticket tool]
     L --> C[(logs/tickets.csv)]
     L --> D{Escalation rule}
@@ -37,9 +39,9 @@ flowchart LR
 
 | Agent | Job | Tool | Output |
 |---|---|---|---|
-| **Customer Query Agent** | Understands the complaint | — | `CATEGORY`, `URGENCY`, `SENTIMENT`, `FLAGS`, `SUMMARY` |
-| **Knowledge Base Agent** | Finds the relevant policy passages | `search_kb(query)` | `KB_SOURCES` + passages copied word for word |
-| **Resolution Agent** | Writes a polite reply using only those passages | — | `REPLY` + `CONFIDENCE` (High/Medium/Low) |
+| **Customer Query Agent** | Understands the complaint | — | `CATEGORY`, `URGENCY`, `SENTIMENT`, `FLAGS`, `SUMMARY`, `LANGUAGE` |
+| **Knowledge Base Agent** | Finds the relevant policy passages, always searching with a full question in English | `search_kb(query)` | `KB_SOURCES` + passages copied word for word |
+| **Resolution Agent** | Writes a polite reply using only those passages, in the customer's language | — | `REPLY` + `CONFIDENCE` (High/Medium/Low) |
 | **Log Agent** | Records the ticket and gets the escalation decision | `log_ticket(...)` | Ticket ID, status, reason, then `LOGGED` |
 
 **Team and termination:** `RoundRobinGroupChat` runs Query → Knowledge → Resolution → Log. It stops when the Log Agent says **`LOGGED`** (`TextMentionTermination`, limited to `log_agent`), with `MaxMessageTermination(10)` as a safety net.
@@ -68,7 +70,7 @@ The rule is plain Python (`decide_escalation()` in `agents/log_agent.py`), not l
 | LLM | OpenAI `gpt-4o-mini` via `autogen-ext[openai]` |
 | Knowledge base | 4 policy **PDFs** → `pypdf` → chunks → `text-embedding-3-small` → **FAISS** |
 | Logging | Python `csv` (+ `pandas` for viewing) |
-| UI | Streamlit |
+| UI | Streamlit + Altair charts |
 
 ---
 
@@ -76,7 +78,8 @@ The rule is plain Python (`decide_escalation()` in `agents/log_agent.py`), not l
 
 ```
 customer-support-agents-autogen/
-├── app.py                    # Streamlit UI
+├── app.py                    # Streamlit UI (New Ticket · Ticket Log · Dashboard)
+├── dashboard.py              # bonus: analytics dashboard (Altair charts)
 ├── team.py                   # wires the 4 agents into one AutoGen team
 ├── llm.py                    # shared OpenAI model client
 ├── kb_store.py               # PDF reading, chunking, FAISS index, search_kb tool
@@ -161,6 +164,16 @@ python test_team.py 5    # just test case 5
 | 7 | I want to change my delivery address, the order hasn't shipped yet. | Shipping · Low · Neutral | shipping_policy.pdf | ✅ Resolved |
 | 8 | Someone placed 2 orders from my account that I didn't make. | Account · High · Angry | account_and_login.pdf | 🚨 Escalated: High urgency + Angry customer + Possible fraud + Low confidence |
 
+### 🌐 Multilingual test cases (bonus)
+
+The samples are in the app's dropdown.
+
+| Complaint | Language detected | Search query sent to FAISS | Reply |
+|---|---|---|---|
+| நான் வாங்கிய பிளெண்டர் உடைந்த நிலையில் வந்தது. எனக்கு மாற்றுப் பொருள் கிடைக்குமா? | Tamil | English full question about a broken blender | Tamil, with the 10-day window and "My Orders" → "Return or Replace" kept exact |
+| मैं अपना पासवर्ड भूल गई हूँ और लॉगिन नहीं कर पा रही हूँ। | Hindi | English full question about a forgotten password | Hindi, with all 5 reset steps |
+| En order innum varala, nethu vandhurum nu sonninga. Enna aachu? | Tamil (Latin script) | English full question about a late order | Tanglish (Tamil in English letters) |
+
 ---
 
 ## 📸 Screenshots
@@ -179,13 +192,41 @@ python test_team.py 5    # just test case 5
 |---|---|
 | ![Custom 1](screenshots/custom_test_1.png) | ![Custom 2](screenshots/custom_test_2.png) |
 
+**📊 Bonus: Dashboard**
+
+![Dashboard](screenshots/dashboard.png)
+
+**🌐 Bonus: reply in the customer's language (Tamil)**
+
+![Tamil reply](screenshots/tamil_reply.png)
+
+---
+
+## 🎁 Bonus features
+
+### 📊 Dashboard
+A third tab, built from `logs/tickets.csv` with Altair:
+- **Headline numbers:** total tickets, % resolved, % escalated, average urgency (Low = 1, Medium = 2, High = 3)
+- **Tickets per category:** green for Resolved, red for Escalated
+- **Urgency mix:** Low / Medium / High
+- **Why tickets were escalated:** each escalation reason counted on its own
+
+Hover over any bar for the exact count.
+
+### 🌐 Reply in the customer's language
+- The **Query Agent** detects the language and script (e.g. `Tamil`, `Hindi`, `Tamil (Latin script)`). The summary stays in English.
+- The **Knowledge Agent** always searches **in English**, because the policy PDFs are in English and an English question matches English text more reliably than a Tamil or Hindi one.
+- The **Resolution Agent** replies in the customer's language and script. Numbers and time frames are kept exactly, and website menu names ("My Orders", "Return or Replace") stay in English so the customer can find them on the site.
+- The **Log Agent** records a `language` column. An older log file without this column is upgraded automatically, and its earlier tickets are marked English.
+- The escalation rule is the same for every language.
+
 ---
 
 ## 📋 Log file format (`logs/tickets.csv`)
 
 One row per ticket:
 
-`ticket_id, timestamp, customer_name, order_id, complaint, category, urgency, sentiment, flags, kb_sources, response, confidence, status, escalation_reason`
+`ticket_id, timestamp, customer_name, order_id, complaint, category, urgency, sentiment, language, flags, kb_sources, response, confidence, status, escalation_reason`
 
 Example: `TKT-0003 · Ravi · ORD-1187 · Billing · High · Angry · refund_policy.pdf · Escalated · High urgency + Angry customer + Legal threat + Payment dispute + Low confidence`
 
@@ -197,7 +238,8 @@ Example: `TKT-0003 · Ravi · ORD-1187 · Billing · High · Angry · refund_pol
 2. **FAISS always returns something.** That makes a similarity cut-off (`KB_MIN_SCORE`) essential for detecting "no matching document". I tuned it from the real scores: real matches scored 0.32–0.57, the out-of-scope gift-card question scored about 0.20, so **0.30** separates them cleanly. At 0.40, useful passages (such as the password reset steps, at 0.39) were dropped.
 3. **Tables in PDFs break retrieval.** Extracted tables came out as loose cells ("15 days" no longer next to "Footwear"). Writing each table row as one full sentence in the PDFs fixed it.
 4. **Escalation belongs in code, not in a prompt.** The model extracts the facts; Python applies the rule. The decision is consistent and testable without calling the LLM (`test_log.py`).
-5. **Safe failure:** even when retrieval failed, the system escalated with an honest reply instead of making up a policy.
+5. **Search in the documents' language, reply in the customer's.** Search scores already dropped sharply for a weak query (0.23 for keywords vs 0.43 for a full question), and a Tamil or Hindi query against English PDFs carries the same risk. So the Knowledge Agent translates the problem into an English question for search, and only the final reply is translated back.
+6. **Safe failure:** even when retrieval failed, the system escalated with an honest reply instead of making up a policy.
 
 ---
 
@@ -205,8 +247,8 @@ Example: `TKT-0003 · Ravi · ORD-1187 · Billing · High · Angry · refund_pol
 
 - `SelectorGroupChat` so the model decides who speaks next
 - A human-in-the-loop approval for escalated replies (`UserProxyAgent`)
-- A dashboard: tickets per category, resolved vs escalated over time
-- Detect the customer's language and reply in the same language
+- Translate the policy documents themselves, so passages are quoted in the customer's language
+- Dashboard trends over time once there are tickets across several days
 - Deploy with Docker on a VPS
 
 ---
