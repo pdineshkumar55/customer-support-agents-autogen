@@ -93,6 +93,7 @@ customer-support-agents-autogen/
 ├── logs/tickets.csv          # created automatically
 ├── faiss_index/              # created automatically (git-ignored)
 ├── screenshots/
+├── check_setup.py            # checks packages and API key are set up
 ├── test_kb.py · test_agents.py · test_log.py · test_team.py   # step-by-step tests
 ├── .env.example
 ├── .gitignore
@@ -139,7 +140,6 @@ The FAISS index is built automatically on the first search and saved to `faiss_i
 **Optional command-line tests:**
 
 ```bash
-python check_setup.py    # check the model and faiss setup done.
 python test_kb.py        # retrieval scores for the 6 test complaints
 python test_log.py       # escalation rule + CSV (no LLM calls)
 python test_team.py      # all 6 complaints through the full team
@@ -158,8 +158,8 @@ python test_team.py 5    # just test case 5
 | 4 | The blender I received is broken… | Product · Medium · Frustrated | product_faq.pdf, refund_policy.pdf | ✅ Resolved |
 | 5 | You charged my card three times!… bank and a lawyer. | Billing · High · Angry | refund_policy.pdf | 🚨 Escalated: High urgency + Angry customer + Legal threat + Payment dispute + Low confidence |
 | 6 | Do you sell gift cards for a company of 500 employees…? | Other · Low · Neutral | NONE | 🚨 Escalated: No matching document + Low confidence |
-| 7 | *(your own test case)* | | | |
-| 8 | *(your own test case)* | | | |
+| 7 | I want to change my delivery address, the order hasn't shipped yet. | Shipping · Low · Neutral | shipping_policy.pdf | ✅ Resolved |
+| 8 | Someone placed 2 orders from my account that I didn't make. | Account · High · Angry | account_and_login.pdf | 🚨 Escalated: High urgency + Angry customer + Possible fraud + Low confidence |
 
 ---
 

@@ -1,5 +1,11 @@
+# Secrets — never commit
 .env
+
+# Python
+venv/
 .venv/
 __pycache__/
 *.pyc
+
+# Generated at runtime
 faiss_index/
