@@ -3,7 +3,7 @@ services:
     build: .
     container_name: shopnest-support
     restart: unless-stopped
-    env_file: .env                    # OPENAI_API_KEY, login hash etc. (stays on the server)
+    env_file: .env                    # OPENAI_API_KEY etc. (stays on the server)
     volumes:
       - ./logs:/app/logs              # ticket log survives restarts and rebuilds
       - ./faiss_index:/app/faiss_index
@@ -14,8 +14,5 @@ services:
       - traefik.http.routers.shopnest.entrypoints=websecure
       - traefik.http.routers.shopnest.tls.certresolver=letsencrypt
       - traefik.http.routers.shopnest.service=shopnest
-      # password prompt before the app opens
-      - traefik.http.routers.shopnest.middlewares=shopnest-auth
-      - traefik.http.middlewares.shopnest-auth.basicauth.users=${SHOPNEST_BASIC_AUTH}
       # Streamlit listens on 8501 inside the container
       - traefik.http.services.shopnest.loadbalancer.server.port=8501
