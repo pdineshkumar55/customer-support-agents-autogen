@@ -1,0 +1,18 @@
+# Secrets — passed at runtime, never baked into the image
+.env
+
+# Local Python / tooling
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.vscode/
+
+# Runtime data (mounted as volumes instead)
+logs/
+faiss_index/
+
+# Not needed inside the container
+screenshots/
+README.md

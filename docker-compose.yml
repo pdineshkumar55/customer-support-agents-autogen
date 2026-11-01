@@ -1,0 +1,26 @@
+services:
+  shopnest:
+    build: .
+    container_name: shopnest-support
+    restart: unless-stopped
+    env_file: .env                    # OPENAI_API_KEY etc. (stays on the server)
+    volumes:
+      - ./logs:/app/logs              # ticket log survives restarts and rebuilds
+      - ./faiss_index:/app/faiss_index
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${PROXY_NETWORK}
+      - traefik.http.routers.shopnest.rule=Host(`shopnest.dinesh-genai.tech`)
+      - traefik.http.routers.shopnest.entrypoints=${TRAEFIK_ENTRYPOINT}
+      - traefik.http.routers.shopnest.tls=true
+      - traefik.http.routers.shopnest.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.routers.shopnest.middlewares=shopnest-auth
+      - traefik.http.middlewares.shopnest-auth.basicauth.users=${SHOPNEST_BASIC_AUTH}
+      - traefik.http.services.shopnest.loadbalancer.server.port=8501
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK}
