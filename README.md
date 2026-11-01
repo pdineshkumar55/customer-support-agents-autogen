@@ -4,6 +4,8 @@ A team of four AI agents, built with **AutoGen**, that handles customer complain
 
 Built for the **Social Eagle AI Engineering Program — Multi-Agent Systems Track** (Buildathon assignment).
 
+🔗 **Live demo:** https://shopnest.dinesh-genai.tech
+
 ![Escalated ticket](screenshots/escalated_ticket.png)
 
 ---
@@ -18,6 +20,7 @@ Built for the **Social Eagle AI Engineering Program — Multi-Agent Systems Trac
 - **CSV ticket log** with every column required by the assignment
 - **Streamlit UI:** live agent timeline, green/red status badge, highlighted reply, log viewer with download
 - **📊 Dashboard** *(bonus)*: headline numbers, tickets per category (resolved vs escalated), urgency mix, and why tickets were escalated
+- **🐳 Deployed with Docker** *(bonus)* on a VPS behind Traefik with automatic HTTPS
 - **🌐 Replies in the customer's language** *(bonus)*: detects English, Tamil, Hindi, Tanglish and more, searches the English documents in English, and replies in the customer's own language and script
 
 ---
@@ -98,6 +101,9 @@ customer-support-agents-autogen/
 ├── screenshots/
 ├── check_setup.py            # checks packages and API key are set up
 ├── test_kb.py · test_agents.py · test_log.py · test_team.py   # step-by-step tests
+├── Dockerfile                # container image (bonus: deployment)
+├── docker-compose.yml        # runs the app behind Traefik on the VPS
+├── .dockerignore
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
@@ -243,13 +249,39 @@ Example: `TKT-0003 · Ravi · ORD-1187 · Billing · High · Angry · refund_pol
 
 ---
 
+## 🐳 Deployment (bonus)
+
+The app runs in Docker on a Hostinger VPS, behind **Traefik**, with automatic HTTPS from Let's Encrypt. It's live at **https://shopnest.dinesh-genai.tech**.
+
+- `Dockerfile`: Python 3.12-slim image running Streamlit on port 8501, with a health check
+- `docker-compose.yml`: no public ports. Traefik labels route `shopnest.dinesh-genai.tech` to the container, so it runs alongside other apps on the same server without port clashes
+- `logs/` and `faiss_index/` are mounted from the server, so tickets survive restarts and rebuilds
+- The OpenAI key lives only in the server's `.env` and is never baked into the image (`.env` is listed in `.dockerignore`)
+
+```bash
+git clone https://github.com/pdineshkumar55/customer-support-agents-autogen.git
+cd customer-support-agents-autogen
+cp .env.example .env    # add your OpenAI key
+docker compose up -d --build
+```
+
+To update after pushing a change:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+> The `docker-compose.yml` labels assume a Traefik instance with a `websecure` entrypoint and a `letsencrypt` certificate resolver. To run the container locally without Traefik, use `docker build -t shopnest .` and then `docker run --rm -p 8501:8501 --env-file .env shopnest`.
+
+---
+
 ## 🔭 Possible next steps
 
 - `SelectorGroupChat` so the model decides who speaks next
 - A human-in-the-loop approval for escalated replies (`UserProxyAgent`)
 - Translate the policy documents themselves, so passages are quoted in the customer's language
 - Dashboard trends over time once there are tickets across several days
-- Deploy with Docker on a VPS
 
 ---
 
