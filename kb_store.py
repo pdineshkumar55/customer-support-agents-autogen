@@ -13,6 +13,7 @@ whenever a PDF is added, removed or changed.
 import json
 import os
 import re
+import threading
 from pathlib import Path
 
 import faiss
@@ -23,15 +24,16 @@ from pypdf import PdfReader
 
 load_dotenv()
 
-KB_DIR = Path("knowledge_base")
-INDEX_DIR = Path("faiss_index")
+BASE_DIR = Path(__file__).resolve().parent
+KB_DIR = BASE_DIR / "knowledge_base"
+INDEX_DIR = BASE_DIR / "faiss_index"
 INDEX_FILE = INDEX_DIR / "index.faiss"
 CHUNKS_FILE = INDEX_DIR / "chunks.json"
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 CHUNK_SIZE = 800      # characters per chunk
 CHUNK_OVERLAP = 150   # characters shared between neighbouring chunks
-MIN_SCORE = float(os.getenv("KB_MIN_SCORE", "0.40"))  # below this = "no match"
+MIN_SCORE = float(os.getenv("KB_MIN_SCORE", "0.30"))  # below this = "no match"
 
 client = OpenAI()  # reads OPENAI_API_KEY from the environment
 
@@ -126,12 +128,14 @@ def load_index():
 
 
 _index, _chunks = None, None
+_index_lock = threading.Lock()  # Streamlit sessions are threads: build the index only once
 
 
 def _get_index():
     global _index, _chunks
-    if _index is None:
-        _index, _chunks = load_index()
+    with _index_lock:
+        if _index is None:
+            _index, _chunks = load_index()
     return _index, _chunks
 
 

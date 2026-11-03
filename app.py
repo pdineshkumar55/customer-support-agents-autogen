@@ -3,6 +3,7 @@
 Run with:  streamlit run app.py
 """
 import asyncio
+import html
 import re
 
 import pandas as pd
@@ -56,6 +57,12 @@ def parse_reply(text: str) -> tuple[str, str]:
             conf.group(1) if conf else "Unknown")
 
 
+def parse_ticket_id(text: str) -> str:
+    """Pull the ticket ID out of the Log Agent's message ('' if missing)."""
+    match = re.search(r"TICKET:\s*(TKT-\d+)", text)
+    return match.group(1) if match else ""
+
+
 def load_log() -> pd.DataFrame:
     if LOG_FILE.exists():
         return pd.read_csv(LOG_FILE, encoding="utf-8-sig").fillna("")
@@ -69,26 +76,27 @@ async def run_ticket(complaint: str, name: str, order_id: str, timeline) -> dict
     outputs = {}
     tool_notes = {}
 
-    async for msg in team.run_stream(task=build_task(complaint, name, order_id)):
-        if isinstance(msg, TaskResult):
-            break
-        source = getattr(msg, "source", "")
-        if source not in AGENTS:
-            continue
-        icon, title, _ = AGENTS[source]
-        if msg.type == "ToolCallRequestEvent":
-            call = msg.content[0]
-            args = call.arguments if len(call.arguments) < 120 else call.arguments[:120] + "…"
-            tool_notes.setdefault(source, []).append(f"🔧 `{call.name}` called with `{args}`")
-        elif msg.type == "TextMessage":
-            outputs[source] = msg.content
-            with timeline:
-                with st.expander(f"{icon} {title}", expanded=True):
-                    for note in tool_notes.get(source, []):
-                        st.caption(note)
-                    st.code(msg.content, language=None, wrap_lines=True)
-
-    await client.close()
+    try:
+        async for msg in team.run_stream(task=build_task(complaint, name, order_id)):
+            if isinstance(msg, TaskResult):
+                break
+            source = getattr(msg, "source", "")
+            if source not in AGENTS:
+                continue
+            icon, title, _ = AGENTS[source]
+            if msg.type == "ToolCallRequestEvent":
+                call = msg.content[0]
+                args = call.arguments if len(call.arguments) < 120 else call.arguments[:120] + "…"
+                tool_notes.setdefault(source, []).append(f"🔧 `{call.name}` called with `{args}`")
+            elif msg.type == "TextMessage":
+                outputs[source] = msg.content
+                with timeline:
+                    with st.expander(f"{icon} {title}", expanded=True):
+                        for note in tool_notes.get(source, []):
+                            st.caption(note)
+                        st.code(msg.content, language=None, wrap_lines=True)
+    finally:
+        await client.close()
     return outputs
 
 
@@ -111,9 +119,9 @@ with tab_new:
 
     with st.form("ticket_form"):
         c1, c2 = st.columns(2)
-        name = c1.text_input("Customer name (optional)", value=s_name)
-        order_id = c2.text_input("Order ID (optional)", value=s_order)
-        complaint = st.text_area("Complaint", value=s_text, height=120,
+        name = c1.text_input("Customer name (optional)", value=s_name, max_chars=100)
+        order_id = c2.text_input("Order ID (optional)", value=s_order, max_chars=100)
+        complaint = st.text_area("Complaint", value=s_text, height=120, max_chars=2000,
                                  placeholder="Describe the problem…")
         submitted = st.form_submit_button("Submit ticket", type="primary")
 
@@ -136,21 +144,26 @@ with tab_new:
                     st.stop()
 
             reply, confidence = parse_reply(outputs.get("resolution_agent", ""))
+            # look the ticket up by its ID, not "last row", so parallel users never mix tickets
+            ticket_id = parse_ticket_id(outputs.get("log_agent", ""))
             log = load_log()
-            last = log.iloc[-1] if not log.empty else None
+            match = log[log["ticket_id"] == ticket_id] if not log.empty else log
+            last = match.iloc[-1] if ticket_id and not match.empty else None
 
-            if last is not None and "log_agent" in outputs:
+            if last is not None:
                 status = last["status"]
                 css = "badge-resolved" if status == "Resolved" else "badge-escalated"
                 label = "✅ Resolved" if status == "Resolved" else "🚨 Escalated to human support"
                 st.markdown(f'<span class="badge {css}">{label}</span> &nbsp; '
-                            f'**{last["ticket_id"]}**', unsafe_allow_html=True)
+                            f'**{html.escape(last["ticket_id"])}**', unsafe_allow_html=True)
                 if status == "Escalated":
                     st.markdown(f"**Reason:** {last['escalation_reason']}")
                 chips = [("Category", last["category"]), ("Urgency", last["urgency"]),
                          ("Sentiment", last["sentiment"]), ("Confidence", confidence),
                          ("Language", last.get("language", "English"))]
-                st.markdown(" ".join(f'<span class="chip"><b>{k}:</b> {v}</span>' for k, v in chips),
+                # values come from the LLM, so escape them before rendering as HTML
+                st.markdown(" ".join(f'<span class="chip"><b>{k}:</b> {html.escape(str(v))}</span>'
+                                     for k, v in chips),
                             unsafe_allow_html=True)
                 st.caption(f"📄 Sources: {last['kb_sources']}")
             else:

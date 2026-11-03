@@ -1,11 +1,13 @@
 """Log Agent — saves every ticket to logs/tickets.csv and decides escalation."""
 import csv
+import threading
 from datetime import datetime
 from pathlib import Path
 
 from autogen_agentchat.agents import AssistantAgent
 
-LOG_FILE = Path("logs") / "tickets.csv"
+LOG_FILE = Path(__file__).resolve().parent.parent / "logs" / "tickets.csv"
+_log_lock = threading.Lock()  # one writer at a time, so ticket IDs never repeat
 COLUMNS = [
     "ticket_id", "timestamp", "customer_name", "order_id", "complaint",
     "category", "urgency", "sentiment", "language", "flags", "kb_sources",
@@ -82,10 +84,9 @@ def log_ticket(
 ) -> str:
     """Save one support ticket to the log file and decide if it must be escalated
     to human support. Returns the ticket ID, status and escalation reason."""
-    _upgrade_log_columns()
     status, reason = decide_escalation(urgency, sentiment, flags, kb_sources, confidence)
     row = {
-        "ticket_id": _next_ticket_id(),
+        "ticket_id": "",
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "customer_name": customer_name or "N/A",
         "order_id": order_id or "N/A",
@@ -102,14 +103,17 @@ def log_ticket(
         "escalation_reason": reason,
     }
 
-    LOG_FILE.parent.mkdir(exist_ok=True)
-    is_new = not LOG_FILE.exists()
-    # utf-8-sig so Excel shows ₹ and other symbols correctly
-    with LOG_FILE.open("a", encoding="utf-8-sig" if is_new else "utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=COLUMNS)
-        if is_new:
-            writer.writeheader()
-        writer.writerow(row)
+    with _log_lock:
+        _upgrade_log_columns()
+        row["ticket_id"] = _next_ticket_id()
+        LOG_FILE.parent.mkdir(exist_ok=True)
+        is_new = not LOG_FILE.exists()
+        # utf-8-sig so Excel shows ₹ and other symbols correctly
+        with LOG_FILE.open("a", encoding="utf-8-sig" if is_new else "utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=COLUMNS)
+            if is_new:
+                writer.writeheader()
+            writer.writerow(row)
 
     return (f"Ticket saved. ticket_id={row['ticket_id']}; status={status}; "
             f"escalation_reason={reason or 'none'}")

@@ -114,7 +114,7 @@ customer-support-agents-autogen/
 
 ## 🚀 Setup and run
 
-**Requirements:** Python 3.10+ and an OpenAI API key.
+**Requirements:** Python 3.12+ and an OpenAI API key. All package versions are pinned in `requirements.txt`.
 
 ```bash
 git clone https://github.com/pdineshkumar55/customer-support-agents-autogen.git
@@ -150,7 +150,7 @@ The FAISS index is built automatically on the first search and saved to `faiss_i
 
 ```bash
 python test_kb.py        # retrieval scores for the 6 test complaints
-python test_log.py       # escalation rule + CSV (no LLM calls)
+python test_log.py       # escalation rule + CSV (no LLM calls, writes to a temp file)
 python test_team.py      # all 6 complaints through the full team
 python test_team.py 5    # just test case 5
 ```
@@ -282,9 +282,15 @@ docker compose up -d --build
 - A human-in-the-loop approval for escalated replies (`UserProxyAgent`)
 - Translate the policy documents themselves, so passages are quoted in the customer's language
 - Dashboard trends over time once there are tickets across several days
+- A login for the Ticket Log tab before real customer data is used (today every visitor can see and download the log)
 
 ---
 
 ## 🔐 Security
 
 API keys live only in `.env`, which is listed in `.gitignore` and never committed. `.env.example` shows the variable names without values.
+
+Because the demo is public:
+- Input is capped (complaint 2,000 characters, name and order ID 100) to limit OpenAI cost.
+- Values written by the LLM are HTML-escaped before they are shown in the result card.
+- Each result is looked up by its own ticket ID, and log writes are locked, so visitors submitting at the same time never get mixed-up or duplicate tickets.

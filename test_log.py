@@ -1,7 +1,14 @@
 """Step 4 test: check the escalation rule and the CSV log (no LLM needed)."""
+import tempfile
+from pathlib import Path
+
 import pandas as pd
 
-from agents.log_agent import LOG_FILE, decide_escalation, log_ticket
+from agents import log_agent
+from agents.log_agent import decide_escalation, log_ticket
+
+# write to a throwaway file so the real logs/tickets.csv stays untouched
+log_agent.LOG_FILE = Path(tempfile.mkdtemp()) / "tickets.csv"
 
 # 1. Escalation rule on its own
 print(decide_escalation("Medium", "Neutral", "none", "account_and_login.pdf", "High"))
@@ -26,5 +33,6 @@ print(log_ticket(
 
 # 3. Show the log file as a table
 pd.set_option("display.max_columns", None, "display.width", 200)
-print(pd.read_csv(LOG_FILE)[["ticket_id", "customer_name", "category", "urgency",
-                             "sentiment", "kb_sources", "status", "escalation_reason"]])
+print(pd.read_csv(log_agent.LOG_FILE, encoding="utf-8-sig")[[
+    "ticket_id", "customer_name", "category", "urgency",
+    "sentiment", "kb_sources", "status", "escalation_reason"]])

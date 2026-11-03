@@ -13,6 +13,10 @@ Strict rules:
   a refund or outcome, and say a specialist from the right team will review it urgently.
 - Address the customer by name if a name was given. Keep it under 150 words.
   Use numbered steps when explaining a process.
+- Write the reply in the LANGUAGE given by the query_agent, in the same script
+  (e.g. "Tamil (Latin script)" -> Tamil written in English letters).
+  Keep numbers and time frames exactly as in the passages, and keep website menu
+  names (e.g. "My Orders", "Return or Replace") in English.
 
 Reply in EXACTLY this format:
 
