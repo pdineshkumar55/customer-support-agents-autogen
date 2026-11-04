@@ -12,6 +12,7 @@ from autogen_agentchat.base import TaskResult
 
 from agents.log_agent import LOG_FILE
 from dashboard import render_dashboard
+from guardrails import check_rate_limit
 from llm import get_model_client
 from team import build_task, create_team
 
@@ -63,6 +64,11 @@ def parse_ticket_id(text: str) -> str:
     return match.group(1) if match else ""
 
 
+def visitor_id() -> str:
+    """The visitor's IP, for the rate limit. Traefik puts the real client IP in X-Real-Ip."""
+    return (st.context.headers.get("X-Real-Ip") or st.context.ip_address or "unknown").strip()
+
+
 def load_log() -> pd.DataFrame:
     if LOG_FILE.exists():
         return pd.read_csv(LOG_FILE, encoding="utf-8-sig").fillna("")
@@ -72,7 +78,7 @@ def load_log() -> pd.DataFrame:
 async def run_ticket(complaint: str, name: str, order_id: str, timeline) -> dict:
     """Run the team and show each agent's output in the timeline as it happens."""
     client = get_model_client()
-    team = create_team(client)
+    team = create_team(client, complaint, name, order_id)
     outputs = {}
     tool_notes = {}
 
@@ -129,6 +135,11 @@ with tab_new:
         if not complaint.strip():
             st.warning("Please enter a complaint.")
             st.stop()
+        wait = check_rate_limit(visitor_id())
+        if wait:
+            st.warning(f"You've sent several tickets in a short time. "
+                       f"Please try again in about {-(-wait // 60)} minute(s).")  # round up
+            st.stop()
 
         left, right = st.columns([1, 1])
         with left:
@@ -151,6 +162,8 @@ with tab_new:
             last = match.iloc[-1] if ticket_id and not match.empty else None
 
             if last is not None:
+                # show what was logged: the guardrails may have replaced an unsafe reply
+                reply, confidence = last["response"] or reply, last["confidence"] or confidence
                 status = last["status"]
                 css = "badge-resolved" if status == "Resolved" else "badge-escalated"
                 label = "✅ Resolved" if status == "Resolved" else "🚨 Escalated to human support"

@@ -1,6 +1,7 @@
 """Knowledge Base Agent — finds the relevant policy passages."""
 from autogen_agentchat.agents import AssistantAgent
 
+from agents import UNTRUSTED_TEXT_RULE
 from kb_store import search_kb
 
 SYSTEM_MESSAGE = """You are the Knowledge Base Agent for ShopNest.
@@ -26,7 +27,9 @@ PASSAGES:
 
 If the tool returns NO_MATCH, or none of the passages are relevant, reply:
 KB_SOURCES: NONE
-PASSAGES: No relevant information found in the knowledge base."""
+PASSAGES: No relevant information found in the knowledge base.
+
+""" + UNTRUSTED_TEXT_RULE
 
 
 def create_knowledge_agent(model_client) -> AssistantAgent:

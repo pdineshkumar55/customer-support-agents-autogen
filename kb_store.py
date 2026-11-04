@@ -139,6 +139,18 @@ def _get_index():
     return _index, _chunks
 
 
+def source_text(source: str) -> str:
+    """All indexed text of one PDF ('' if it is not in the knowledge base). Used by guardrails.py."""
+    _, chunks = _get_index()
+    return "\n".join(c["text"] for c in chunks if c["source"] == source)
+
+
+def known_sources() -> set[str]:
+    """File names of every PDF in the knowledge base. Used by guardrails.py."""
+    _, chunks = _get_index()
+    return {c["source"] for c in chunks}
+
+
 # ---------- 5. The tool the Knowledge Agent will call ----------
 def search_kb_raw(query: str, top_k: int = 3) -> list[dict]:
     """Return the top matches as dicts: source, score, text (used for testing)."""

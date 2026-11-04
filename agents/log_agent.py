@@ -5,6 +5,10 @@ from datetime import datetime
 from pathlib import Path
 
 from autogen_agentchat.agents import AssistantAgent
+from autogen_core.tools import FunctionTool
+
+from guardrails import (SAFE_FALLBACK_REPLY, SELF_HARM_REPLY, injection_detected, moderate,
+                        normalise_field, unverified_numbers, valid_kb_sources)
 
 LOG_FILE = Path(__file__).resolve().parent.parent / "logs" / "tickets.csv"
 _log_lock = threading.Lock()  # one writer at a time, so ticket IDs never repeat
@@ -33,6 +37,18 @@ def decide_escalation(urgency: str, sentiment: str, flags: str,
         reasons.append("Possible fraud")
     if "payment_dispute" in flag_text:
         reasons.append("Payment dispute")
+    if "prompt_injection" in flag_text:
+        reasons.append("Possible prompt injection")
+    if "unverified_claim" in flag_text:
+        reasons.append("Unverified claim in reply")
+    if "harmful_content" in flag_text:
+        reasons.append("Harmful content")
+    if "unsafe_reply" in flag_text:
+        reasons.append("Unsafe reply replaced")
+    if "safety_check_unavailable" in flag_text:
+        reasons.append("Safety check unavailable")
+    if "invalid_field" in flag_text:
+        reasons.append("Invalid agent output")
     if confidence.strip().lower() == "low":
         reasons.append("Low confidence")
 
@@ -68,6 +84,13 @@ def _next_ticket_id() -> str:
     return f"TKT-{count + 1:04d}"
 
 
+def _add_flag(flags: str, flag: str) -> str:
+    """Append a flag to the comma-separated flags ('none' is replaced)."""
+    if flag.split("(")[0] in flags:
+        return flags
+    return flag if flags.strip().lower() in ("", "none") else f"{flags}, {flag}"
+
+
 # ---------- The tool the Log Agent calls ----------
 def log_ticket(
     complaint: str,
@@ -84,6 +107,45 @@ def log_ticket(
 ) -> str:
     """Save one support ticket to the log file and decide if it must be escalated
     to human support. Returns the ticket ID, status and escalation reason."""
+    # ---------- guardrails: checked in Python, so the LLM can't skip them ----------
+    flags = flags.strip() or "none"
+
+    # the agents' answers must be allowed values ("high." is fixed to "High")
+    fields = {"category": category, "urgency": urgency,
+              "sentiment": sentiment, "confidence": confidence}
+    invalid = []
+    for name, value in fields.items():
+        fields[name], ok = normalise_field(name, value)
+        if not ok:
+            invalid.append(name)
+    category, urgency, sentiment, confidence = fields.values()
+    if not valid_kb_sources(kb_sources):
+        invalid.append("kb_sources")
+    if not response.strip():
+        invalid.append("response")
+    if invalid:
+        flags = _add_flag(flags, f"invalid_field({', '.join(invalid)})")
+
+    if injection_detected(f"{customer_name}\n{order_id}\n{complaint}"):
+        flags = _add_flag(flags, "prompt_injection")
+
+    unverified = unverified_numbers(response, kb_sources, complaint, order_id, customer_name)
+    if unverified:
+        flags = _add_flag(flags, f"unverified_claim({', '.join(unverified)})")
+
+    checked = moderate(complaint, response or "-")
+    if checked is None:  # API down: let a human check it
+        flags = _add_flag(flags, "safety_check_unavailable")
+    else:
+        harmful, reply_unsafe = checked
+        if reply_unsafe:
+            flags = _add_flag(flags, "unsafe_reply")
+            response = SAFE_FALLBACK_REPLY
+        if harmful:
+            flags = _add_flag(flags, f"harmful_content({', '.join(sorted(harmful))})")
+            if any(c.startswith("self_harm") for c in harmful):
+                response = SELF_HARM_REPLY
+
     status, reason = decide_escalation(urgency, sentiment, flags, kb_sources, confidence)
     row = {
         "ticket_id": "",
@@ -122,8 +184,8 @@ def log_ticket(
 SYSTEM_MESSAGE = """You are the Log Agent for ShopNest customer support.
 Your ONLY job is to record the ticket. Do not change or rewrite anything.
 
-1. Call the log_ticket tool ONCE. Copy the values exactly from the conversation:
-   - complaint, customer_name, order_id: from the original task (use "N/A" if missing)
+1. Call the log_ticket tool ONCE. Copy the values exactly from the conversation
+   (the complaint, customer name and order ID are filled in automatically):
    - category, urgency, sentiment, flags, language: from the query_agent
    - kb_sources: from the knowledge_agent's KB_SOURCES line (NONE if none)
    - response: the full text under REPLY from the resolution_agent
@@ -136,12 +198,20 @@ ESCALATION_REASON: <reason, or none>
 LOGGED"""
 
 
-def create_log_agent(model_client) -> AssistantAgent:
+def create_log_agent(model_client, complaint: str, customer_name: str = "",
+                     order_id: str = "") -> AssistantAgent:
+    def save_ticket(category: str, urgency: str, sentiment: str, flags: str, kb_sources: str,
+                    response: str, confidence: str, language: str = "English") -> str:
+        # complaint, name and order ID come from the real ticket, never from the LLM
+        return log_ticket(complaint, category, urgency, sentiment, flags, kb_sources,
+                          response, confidence, language,
+                          customer_name.strip() or "N/A", order_id.strip() or "N/A")
+
     return AssistantAgent(
         name="log_agent",
         description="Records the ticket to the log file and decides whether to escalate to a human.",
         model_client=model_client,
-        tools=[log_ticket],
+        tools=[FunctionTool(save_ticket, name="log_ticket", description=log_ticket.__doc__)],
         reflect_on_tool_use=True,
         system_message=SYSTEM_MESSAGE,
     )

@@ -20,7 +20,7 @@ TEST_CASES = [
 
 
 async def run_one(client, name, order_id, complaint):
-    team = create_team(client)  # fresh team = fresh memory for every ticket
+    team = create_team(client, complaint, name, order_id)  # fresh team = fresh memory for every ticket
     result = await Console(team.run_stream(task=build_task(complaint, name, order_id)))
     print(f"\n>>> Stopped because: {result.stop_reason}\n" + "#" * 80)
 
