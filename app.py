@@ -4,13 +4,14 @@ Run with:  streamlit run app.py
 """
 import asyncio
 import html
+import logging
 import re
 
 import pandas as pd
 import streamlit as st
 from autogen_agentchat.base import TaskResult
 
-from agents.log_agent import LOG_FILE
+from agents.log_agent import LOG_FILE, parse_reply
 from dashboard import render_dashboard
 from guardrails import check_rate_limit
 from llm import get_model_client
@@ -50,14 +51,6 @@ st.markdown("""
 
 
 # ---------- helpers ----------
-def parse_reply(text: str) -> tuple[str, str]:
-    """Split the Resolution Agent's message into (reply, confidence)."""
-    reply = re.search(r"REPLY:\s*(.*?)\s*CONFIDENCE:", text, re.S)
-    conf = re.search(r"CONFIDENCE:\s*(\w+)", text)
-    return (reply.group(1).strip() if reply else text.strip(),
-            conf.group(1) if conf else "Unknown")
-
-
 def parse_ticket_id(text: str) -> str:
     """Pull the ticket ID out of the Log Agent's message ('' if missing)."""
     match = re.search(r"TICKET:\s*(TKT-\d+)", text)
@@ -150,8 +143,10 @@ with tab_new:
             with st.spinner("The agents are working on this ticket…"):
                 try:
                     outputs = asyncio.run(run_ticket(complaint, name, order_id, timeline))
-                except Exception as e:
-                    st.error(f"Something went wrong: {e}")
+                except Exception:
+                    # full details go to the server log (docker compose logs), never to the visitor
+                    logging.exception("Ticket failed")
+                    st.error("Sorry, something went wrong while handling this ticket. Please try again.")
                     st.stop()
 
             reply, confidence = parse_reply(outputs.get("resolution_agent", ""))

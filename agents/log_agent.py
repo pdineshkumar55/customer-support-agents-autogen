@@ -1,11 +1,16 @@
 """Log Agent — saves every ticket to logs/tickets.csv and decides escalation."""
+import asyncio
 import csv
+import re
 import threading
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 
-from autogen_agentchat.agents import AssistantAgent
-from autogen_core.tools import FunctionTool
+from autogen_agentchat.agents import BaseChatAgent
+from autogen_agentchat.base import Response
+from autogen_agentchat.messages import BaseChatMessage, TextMessage
+from autogen_core import CancellationToken
 
 from guardrails import (SAFE_FALLBACK_REPLY, SELF_HARM_REPLY, injection_detected, moderate,
                         normalise_field, unverified_numbers, valid_kb_sources)
@@ -76,12 +81,14 @@ def _upgrade_log_columns() -> None:
 
 
 def _next_ticket_id() -> str:
-    """TKT-0001, TKT-0002, ... based on how many rows are already in the log."""
+    """TKT-0001, TKT-0002, ... one more than the highest ID so far
+    (not the row count, so a deleted row never causes a repeated ID)."""
     if not LOG_FILE.exists():
         return "TKT-0001"
     with LOG_FILE.open(encoding="utf-8-sig", newline="") as f:
-        count = sum(1 for _ in csv.DictReader(f))
-    return f"TKT-{count + 1:04d}"
+        numbers = [int(m.group(1)) for row in csv.DictReader(f)
+                   if (m := re.fullmatch(r"TKT-(\d+)", row.get("ticket_id") or ""))]
+    return f"TKT-{max(numbers, default=0) + 1:04d}"
 
 
 def _add_flag(flags: str, flag: str) -> str:
@@ -91,7 +98,7 @@ def _add_flag(flags: str, flag: str) -> str:
     return flag if flags.strip().lower() in ("", "none") else f"{flags}, {flag}"
 
 
-# ---------- The tool the Log Agent calls ----------
+# ---------- Save one ticket (called by the Log Agent) ----------
 def log_ticket(
     complaint: str,
     category: str,
@@ -104,10 +111,10 @@ def log_ticket(
     language: str = "English",
     customer_name: str = "N/A",
     order_id: str = "N/A",
-) -> str:
+) -> dict:
     """Save one support ticket to the log file and decide if it must be escalated
-    to human support. Returns the ticket ID, status and escalation reason."""
-    # ---------- guardrails: checked in Python, so the LLM can't skip them ----------
+    to human support. Returns the saved row (ticket_id, status, escalation_reason, ...)."""
+    # ---------- guardrails: checked in Python, so they can't be skipped ----------
     flags = flags.strip() or "none"
 
     # the agents' answers must be allowed values ("high." is fixed to "High")
@@ -177,41 +184,70 @@ def log_ticket(
                 writer.writeheader()
             writer.writerow(row)
 
-    return (f"Ticket saved. ticket_id={row['ticket_id']}; status={status}; "
-            f"escalation_reason={reason or 'none'}")
+    return row
 
 
-SYSTEM_MESSAGE = """You are the Log Agent for ShopNest customer support.
-Your ONLY job is to record the ticket. Do not change or rewrite anything.
-
-1. Call the log_ticket tool ONCE. Copy the values exactly from the conversation
-   (the complaint, customer name and order ID are filled in automatically):
-   - category, urgency, sentiment, flags, language: from the query_agent
-   - kb_sources: from the knowledge_agent's KB_SOURCES line (NONE if none)
-   - response: the full text under REPLY from the resolution_agent
-   - confidence: from the resolution_agent's CONFIDENCE line
-2. After the tool returns, reply in EXACTLY this format:
-
-TICKET: <ticket_id>
-STATUS: <Resolved or Escalated>
-ESCALATION_REASON: <reason, or none>
-LOGGED"""
+# ---------- Reading the other agents' answers ----------
+def parse_reply(text: str) -> tuple[str, str]:
+    """Split the Resolution Agent's message into (reply, confidence)."""
+    reply = re.search(r"REPLY:\s*(.*?)\s*CONFIDENCE:", text, re.S)
+    conf = re.search(r"CONFIDENCE:\s*(\w+)", text)
+    return (reply.group(1).strip() if reply else text.strip(),
+            conf.group(1) if conf else "Unknown")
 
 
-def create_log_agent(model_client, complaint: str, customer_name: str = "",
-                     order_id: str = "") -> AssistantAgent:
-    def save_ticket(category: str, urgency: str, sentiment: str, flags: str, kb_sources: str,
-                    response: str, confidence: str, language: str = "English") -> str:
-        # complaint, name and order ID come from the real ticket, never from the LLM
-        return log_ticket(complaint, category, urgency, sentiment, flags, kb_sources,
-                          response, confidence, language,
-                          customer_name.strip() or "N/A", order_id.strip() or "N/A")
+def _field(text: str, name: str) -> str:
+    """The value after 'NAME:' on its own line ('' if missing). Allows **bold** markdown."""
+    match = re.search(rf"^[*\s]*{name}[*\s]*:[*\s]*(.+?)[*\s]*$", text, re.M | re.I)
+    return match.group(1) if match else ""
 
-    return AssistantAgent(
-        name="log_agent",
-        description="Records the ticket to the log file and decides whether to escalate to a human.",
-        model_client=model_client,
-        tools=[FunctionTool(save_ticket, name="log_ticket", description=log_ticket.__doc__)],
-        reflect_on_tool_use=True,
-        system_message=SYSTEM_MESSAGE,
-    )
+
+# ---------- The Log Agent: plain Python, no LLM ----------
+class LogAgent(BaseChatAgent):
+    """Reads the other agents' answers straight from the conversation and saves the ticket.
+    Copying is bookkeeping, not thinking, so no LLM is needed: it can't mistype the reply,
+    and it saves two LLM calls per ticket."""
+
+    def __init__(self, complaint: str, customer_name: str = "", order_id: str = ""):
+        super().__init__(
+            name="log_agent",
+            description="Records the ticket to the log file and decides whether to escalate to a human.",
+        )
+        # the real ticket, as typed by the customer
+        self._complaint = complaint
+        self._customer_name = customer_name.strip() or "N/A"
+        self._order_id = order_id.strip() or "N/A"
+
+    @property
+    def produced_message_types(self) -> Sequence[type[BaseChatMessage]]:
+        return (TextMessage,)
+
+    async def on_messages(self, messages: Sequence[BaseChatMessage],
+                          cancellation_token: CancellationToken) -> Response:
+        latest = {m.source: m.to_text() for m in messages}  # last message of each agent
+        query = latest.get("query_agent", "")
+        reply, confidence = parse_reply(latest.get("resolution_agent", ""))
+
+        # a missing field arrives as "" and the field-validation guardrail escalates it
+        row = await asyncio.to_thread(  # file writes + moderation call: keep them off the event loop
+            log_ticket,
+            complaint=self._complaint,
+            category=_field(query, "CATEGORY"),
+            urgency=_field(query, "URGENCY"),
+            sentiment=_field(query, "SENTIMENT"),
+            flags=_field(query, "FLAGS"),
+            kb_sources=_field(latest.get("knowledge_agent", ""), "KB_SOURCES"),
+            response=reply,
+            confidence=confidence,
+            language=_field(query, "LANGUAGE") or "English",
+            customer_name=self._customer_name,
+            order_id=self._order_id,
+        )
+        content = (f"TICKET: {row['ticket_id']}\n"
+                   f"STATUS: {row['status']}\n"
+                   f"ESCALATION_REASON: {row['escalation_reason'] or 'none'}\n"
+                   "LOGGED")
+        return Response(chat_message=TextMessage(content=content, source=self.name))
+
+    async def on_reset(self, cancellation_token: CancellationToken) -> None:
+        pass  # keeps no memory between tickets

@@ -3,7 +3,7 @@ from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermi
 from autogen_agentchat.teams import RoundRobinGroupChat
 
 from agents.knowledge_agent import create_knowledge_agent
-from agents.log_agent import create_log_agent
+from agents.log_agent import LogAgent
 from agents.query_agent import create_query_agent
 from agents.resolution_agent import create_resolution_agent
 
@@ -13,12 +13,13 @@ AGENT_ORDER = ["query_agent", "knowledge_agent", "resolution_agent", "log_agent"
 def create_team(model_client, complaint: str, customer_name: str = "",
                 order_id: str = "") -> RoundRobinGroupChat:
     """Query -> Knowledge -> Resolution -> Log, then stop.
-    The Log Agent gets the raw ticket, so it saves (and guardrail-checks) the customer's exact words."""
+    The Log Agent (plain Python, no LLM) gets the raw ticket, so it saves (and
+    guardrail-checks) the customer's exact words."""
     agents = [
         create_query_agent(model_client),
         create_knowledge_agent(model_client),
         create_resolution_agent(model_client),
-        create_log_agent(model_client, complaint, customer_name, order_id),
+        LogAgent(complaint, customer_name, order_id),
     ]
 
     # Stop when the Log Agent says LOGGED, or after 10 messages as a safety net.

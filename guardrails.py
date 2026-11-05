@@ -134,6 +134,7 @@ def valid_kb_sources(kb_sources: str) -> bool:
 MAX_PER_VISITOR = int(os.getenv("MAX_TICKETS_PER_VISITOR", "5"))  # per 10 minutes
 MAX_TOTAL = int(os.getenv("MAX_TICKETS_PER_HOUR", "60"))          # all visitors together
 _VISITOR_WINDOW, _TOTAL_WINDOW = 10 * 60, 60 * 60
+_PRUNE_AT = 1000  # tidy up the visitor list once it is this long
 
 _visitor_hits: dict[str, deque] = {}
 _all_hits: deque = deque()
@@ -154,6 +155,9 @@ def check_rate_limit(visitor: str) -> int:
     """Record one ticket for this visitor. Returns 0 if allowed, else seconds to wait."""
     now = time.time()
     with _rate_lock:
+        if len(_visitor_hits) > _PRUNE_AT:  # forget visitors with no recent tickets
+            for key in [k for k, h in _visitor_hits.items() if not h or now - h[-1] > _VISITOR_WINDOW]:
+                del _visitor_hits[key]
         hits = _visitor_hits.setdefault(visitor, deque())
         wait = max(_wait_time(hits, MAX_PER_VISITOR, _VISITOR_WINDOW, now),
                    _wait_time(_all_hits, MAX_TOTAL, _TOTAL_WINDOW, now))
