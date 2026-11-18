@@ -13,7 +13,7 @@ Built for the **Social Eagle AI Engineering Program — Multi-Agent Systems Trac
 ## ✨ Features
 
 - **4 AutoGen agents**, each with one clear job, running in a fixed order with `RoundRobinGroupChat`
-- **Grounded answers (RAG):** policy PDFs → chunks → OpenAI embeddings → **FAISS** vector search *(bonus)*
+- **Grounded answers (RAG):** policy PDFs → chunks → OpenAI embeddings → **FAISS** vector search *(bonus)*, fused with a **BM25** keyword pass so exact terms like `COD`, `AWB` or `NEFT` always match
 - **Shows its sources:** every reply lists the PDF file(s) it used
 - **No made-up policies:** if nothing relevant is found, the reply says so honestly and the ticket is escalated
 - **Rule-based escalation** applied in Python, so it is the same every time
@@ -110,7 +110,7 @@ The UI shows the reply that was saved in the log, so the customer always sees th
 |---|---|
 | Agents | AutoGen `autogen-agentchat` 0.7 (`AssistantAgent`, a custom `BaseChatAgent`, `RoundRobinGroupChat`) |
 | LLM | OpenAI `gpt-4o-mini` via `autogen-ext[openai]` |
-| Knowledge base | 4 policy **PDFs** → `pypdf` → chunks → `text-embedding-3-small` → **FAISS** |
+| Knowledge base | 4 policy **PDFs** → `pypdf` → chunks → `text-embedding-3-small` → **FAISS**, plus **BM25** keyword search (plain Python), merged with reciprocal rank fusion |
 | Logging | Python `csv` (+ `pandas` for viewing) |
 | UI | Streamlit + Altair charts |
 
@@ -124,7 +124,7 @@ customer-support-agents-autogen/
 ├── dashboard.py              # bonus: analytics dashboard (Altair charts)
 ├── team.py                   # wires the 4 agents into one AutoGen team
 ├── llm.py                    # shared OpenAI model client
-├── kb_store.py               # PDF reading, chunking, FAISS index, search_kb tool
+├── kb_store.py               # PDF reading, chunking, FAISS + BM25 hybrid search, search_kb tool
 ├── guardrails.py             # fact-check, prompt injection, moderation, field validation, rate limit
 ├── agents/
 │   ├── query_agent.py        # Customer Query Agent
@@ -192,7 +192,7 @@ The FAISS index is built automatically on the first search and saved to `faiss_i
 ```bash
 pip install -r requirements-dev.txt
 pytest test_log.py                  # escalation rule + guardrails + CSV (no LLM; temp log file)
-pytest test_kb.py                   # each complaint's best FAISS match is the right PDF (embeddings API)
+pytest test_kb.py                   # hybrid search: right PDF per complaint, exact terms like COD (embeddings API)
 pytest test_team.py                 # all 8 complaints through the full team (real LLM calls)
 pytest test_team.py -k charged      # just test case 5
 pytest -m "not llm"                 # everything except the full-team run
@@ -290,8 +290,9 @@ Example: `TKT-0003 · Ravi · ORD-1187 · Billing · High · Angry · refund_pol
 3. **Tables in PDFs break retrieval.** Extracted tables came out as loose cells ("15 days" no longer next to "Footwear"). Writing each table row as one full sentence in the PDFs fixed it.
 4. **Escalation belongs in code, not in a prompt.** The model extracts the facts; Python applies the rule. The decision is consistent and testable without calling the LLM (`test_log.py`).
 5. **Search in the documents' language, reply in the customer's.** Search scores already dropped sharply for a weak query (0.23 for keywords vs 0.43 for a full question), and a Tamil or Hindi query against English PDFs carries the same risk. So the Knowledge Agent translates the problem into an English question for search, and only the final reply is translated back.
-6. **Safe failure:** even when retrieval failed, the system escalated with an honest reply instead of making up a policy.
-7. **Bookkeeping doesn't need an LLM.** The Log Agent first used the model to re-type every field and the full reply into a tool call. That cost 2 extra LLM calls per ticket, and the saved reply could differ from the one the customer got. As a plain-Python AutoGen agent, it reads the other agents' messages directly: it's cheaper, faster, and the log matches the real reply exactly.
+6. **Meaning-based search can miss exact terms.** Embeddings match by meaning, so a short query about `COD`, `AWB` or `NEFT` depends on the model knowing the acronym, and the Knowledge Agent may rephrase it away. Search is now hybrid: a BM25 keyword pass runs next to FAISS, and the two rankings are merged with reciprocal rank fusion (by rank, so cosine and BM25 scales never need tuning against each other). The `KB_MIN_SCORE` cut-off still decides what counts as a match, with one exception: a passage that contains an exact identifier from the query (an acronym of 3+ letters such as `COD`, or letters mixed with digits such as `ORD-4512`) always counts. Plain words don't qualify, so the gift-card question still finds no document, even though words like "company" appear in the PDFs.
+7. **Safe failure:** even when retrieval failed, the system escalated with an honest reply instead of making up a policy.
+8. **Bookkeeping doesn't need an LLM.** The Log Agent first used the model to re-type every field and the full reply into a tool call. That cost 2 extra LLM calls per ticket, and the saved reply could differ from the one the customer got. As a plain-Python AutoGen agent, it reads the other agents' messages directly: it's cheaper, faster, and the log matches the real reply exactly.
 
 ---
 
