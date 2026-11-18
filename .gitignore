@@ -9,3 +9,6 @@ __pycache__/
 
 # Generated at runtime
 faiss_index/
+# Ticket logs hold customer data: never commit them (logs/tickets.sample.csv shows the format)
+logs/*.csv
+!logs/tickets.sample.csv

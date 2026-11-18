@@ -136,7 +136,8 @@ customer-support-agents-autogen/
 │   ├── refund_policy.pdf
 │   ├── account_and_login.pdf
 │   └── product_faq.pdf
-├── logs/tickets.csv          # created automatically
+├── logs/tickets.csv          # created automatically, git-ignored (customer data)
+├── logs/tickets.sample.csv   # empty log with the column header, shows the format
 ├── faiss_index/              # created automatically (git-ignored)
 ├── screenshots/
 ├── check_setup.py            # checks packages and API key are set up
