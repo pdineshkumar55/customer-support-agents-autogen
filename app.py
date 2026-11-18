@@ -10,8 +10,10 @@ import re
 import pandas as pd
 import streamlit as st
 from autogen_agentchat.base import TaskResult
+from autogen_agentchat.messages import StructuredMessage, TextMessage
 
-from agents.log_agent import LOG_FILE, parse_reply
+from agents.log_agent import LOG_FILE
+from agents.schemas import Resolution
 from dashboard import render_dashboard
 from guardrails import check_rate_limit
 from llm import get_model_client
@@ -87,13 +89,13 @@ async def run_ticket(complaint: str, name: str, order_id: str, timeline) -> dict
                 call = msg.content[0]
                 args = call.arguments if len(call.arguments) < 120 else call.arguments[:120] + "…"
                 tool_notes.setdefault(source, []).append(f"🔧 `{call.name}` called with `{args}`")
-            elif msg.type == "TextMessage":
-                outputs[source] = msg.content
+            elif isinstance(msg, (TextMessage, StructuredMessage)):
+                outputs[source] = msg.content  # str, or a pydantic model (query / resolution)
                 with timeline:
                     with st.expander(f"{icon} {title}", expanded=True):
                         for note in tool_notes.get(source, []):
                             st.caption(note)
-                        st.code(msg.content, language=None, wrap_lines=True)
+                        st.code(msg.to_text(), language=None, wrap_lines=True)
     finally:
         await client.close()
     return outputs
@@ -149,7 +151,9 @@ with tab_new:
                     st.error("Sorry, something went wrong while handling this ticket. Please try again.")
                     st.stop()
 
-            reply, confidence = parse_reply(outputs.get("resolution_agent", ""))
+            resolution = outputs.get("resolution_agent")
+            reply, confidence = ((resolution.reply, resolution.confidence)
+                                 if isinstance(resolution, Resolution) else ("", ""))
             # look the ticket up by its ID, not "last row", so parallel users never mix tickets
             ticket_id = parse_ticket_id(outputs.get("log_agent", ""))
             log = load_log()

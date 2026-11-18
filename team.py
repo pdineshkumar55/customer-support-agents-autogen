@@ -1,11 +1,13 @@
 """team.py — wires the 4 agents into one AutoGen team."""
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
+from autogen_agentchat.messages import StructuredMessage
 from autogen_agentchat.teams import RoundRobinGroupChat
 
 from agents.knowledge_agent import create_knowledge_agent
 from agents.log_agent import LogAgent
 from agents.query_agent import create_query_agent
 from agents.resolution_agent import create_resolution_agent
+from agents.schemas import QueryAnalysis, Resolution
 
 AGENT_ORDER = ["query_agent", "knowledge_agent", "resolution_agent", "log_agent"]
 
@@ -27,7 +29,11 @@ def create_team(model_client, complaint: str, customer_name: str = "",
         TextMentionTermination("LOGGED", sources=["log_agent"])
         | MaxMessageTermination(10)
     )
-    return RoundRobinGroupChat(agents, termination_condition=termination)
+    return RoundRobinGroupChat(
+        agents, termination_condition=termination,
+        # the Query and Resolution Agents answer with pydantic models, not text
+        custom_message_types=[StructuredMessage[QueryAnalysis], StructuredMessage[Resolution]],
+    )
 
 
 def _clean(text: str) -> str:

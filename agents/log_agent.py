@@ -9,13 +9,18 @@ from pathlib import Path
 
 from autogen_agentchat.agents import BaseChatAgent
 from autogen_agentchat.base import Response
-from autogen_agentchat.messages import BaseChatMessage, TextMessage
-from autogen_core import CancellationToken
+from typing import TypeVar
 
+from autogen_agentchat.messages import BaseChatMessage, StructuredMessage, TextMessage
+from autogen_core import CancellationToken
+from pydantic import BaseModel
+
+from agents.schemas import QueryAnalysis, Resolution
 from guardrails import (SAFE_FALLBACK_REPLY, SELF_HARM_REPLY, injection_detected, moderate,
                         normalise_field, unverified_numbers, valid_kb_sources)
 
 LOG_FILE = Path(__file__).resolve().parent.parent / "logs" / "tickets.csv"
+T = TypeVar("T", bound=BaseModel)
 _log_lock = threading.Lock()  # one writer at a time, so ticket IDs never repeat
 COLUMNS = [
     "ticket_id", "timestamp", "customer_name", "order_id", "complaint",
@@ -188,12 +193,12 @@ def log_ticket(
 
 
 # ---------- Reading the other agents' answers ----------
-def parse_reply(text: str) -> tuple[str, str]:
-    """Split the Resolution Agent's message into (reply, confidence)."""
-    reply = re.search(r"REPLY:\s*(.*?)\s*CONFIDENCE:", text, re.S)
-    conf = re.search(r"CONFIDENCE:\s*(\w+)", text)
-    return (reply.group(1).strip() if reply else text.strip(),
-            conf.group(1) if conf else "Unknown")
+def _structured(messages: Sequence[BaseChatMessage], source: str, model: type[T]) -> T | None:
+    """The last answer of `source` as its pydantic model (None if it never answered)."""
+    for m in reversed(messages):
+        if m.source == source and isinstance(m, StructuredMessage) and isinstance(m.content, model):
+            return m.content
+    return None
 
 
 def _field(text: str, name: str) -> str:
@@ -224,22 +229,25 @@ class LogAgent(BaseChatAgent):
 
     async def on_messages(self, messages: Sequence[BaseChatMessage],
                           cancellation_token: CancellationToken) -> Response:
-        latest = {m.source: m.to_text() for m in messages}  # last message of each agent
-        query = latest.get("query_agent", "")
-        reply, confidence = parse_reply(latest.get("resolution_agent", ""))
+        # Query and Resolution answers are pydantic models (already schema-checked);
+        # only the Knowledge Agent (tool use) still answers in text.
+        query = _structured(messages, "query_agent", QueryAnalysis)
+        resolution = _structured(messages, "resolution_agent", Resolution)
+        knowledge = next((m.to_text() for m in reversed(messages)
+                          if m.source == "knowledge_agent"), "")
 
-        # a missing field arrives as "" and the field-validation guardrail escalates it
+        # a missing answer arrives as "" and the field-validation guardrail escalates it
         row = await asyncio.to_thread(  # file writes + moderation call: keep them off the event loop
             log_ticket,
             complaint=self._complaint,
-            category=_field(query, "CATEGORY"),
-            urgency=_field(query, "URGENCY"),
-            sentiment=_field(query, "SENTIMENT"),
-            flags=_field(query, "FLAGS"),
-            kb_sources=_field(latest.get("knowledge_agent", ""), "KB_SOURCES"),
-            response=reply,
-            confidence=confidence,
-            language=_field(query, "LANGUAGE") or "English",
+            category=query.category if query else "",
+            urgency=query.urgency if query else "",
+            sentiment=query.sentiment if query else "",
+            flags=query.flags_text() if query else "none",
+            kb_sources=_field(knowledge, "KB_SOURCES"),
+            response=resolution.reply if resolution else "",
+            confidence=resolution.confidence if resolution else "",
+            language=(query.language.strip() if query else "") or "English",
             customer_name=self._customer_name,
             order_id=self._order_id,
         )

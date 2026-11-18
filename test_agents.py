@@ -18,7 +18,7 @@ async def main(complaint: str):
 
     # 1. Query Agent
     result = await query_agent.run(task=complaint)
-    analysis = result.messages[-1].content
+    analysis = result.messages[-1].to_text()
     print("\n--- query_agent ---\n" + analysis)
 
     # 2. Knowledge Agent (gets the complaint + analysis)
@@ -33,7 +33,7 @@ async def main(complaint: str):
     result = await resolution_agent.run(
         task=f"Complaint: {complaint}\n\n{analysis}\n\n{knowledge}"
     )
-    print("\n--- resolution_agent ---\n" + result.messages[-1].content)
+    print("\n--- resolution_agent ---\n" + result.messages[-1].to_text())
 
     await client.close()
 
