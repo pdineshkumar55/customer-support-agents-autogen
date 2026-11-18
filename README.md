@@ -102,6 +102,8 @@ The UI shows the reply that was saved in the log, so the customer always sees th
 
 **5. Rate limits.** These run in `app.py` before any agent starts. Each visitor (by IP, from Traefik's `X-Real-Ip` header) can send **5 tickets every 10 minutes**, and the whole site **60 tickets an hour**. Over the limit, the visitor sees a "please try again in N minutes" message, and no OpenAI calls are made. Both limits can be changed with `MAX_TICKETS_PER_VISITOR` and `MAX_TICKETS_PER_HOUR` in `.env`; setting them to `0` stops new submissions. The counts are kept in memory, so they reset when the app restarts.
 
+**6. PII masking.** Card numbers, phone numbers and email addresses in the customer's name, order ID and complaint are replaced before any model sees them (`build_task()` in `team.py`) and again before the ticket is saved or sent to the Moderation API (`log_ticket()`). Cards become `[CARD ending 1111]`: only 13–19 digit numbers that pass the Luhn check count, so order IDs, tracking numbers and ₹ amounts are left alone, and the last 4 digits let support tell which card is meant. Indian mobiles (with or without `+91`/`0`) and any `+`-prefixed international number become `[PHONE]`, and emails become `[EMAIL]`. ShopNest's own addresses (`@shopnest.in`) and the 1800 helpline are not customer data and stay as they are. The reply is not masked, because it never sees the customer's details in the first place.
+
 ---
 
 ## 🛠️ Tech stack

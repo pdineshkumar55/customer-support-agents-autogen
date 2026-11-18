@@ -41,3 +41,14 @@ def test_team_handles_complaint(case, temp_log):
     assert row["category"] == case.category, details
     assert row["status"] == case.status, details
     assert row["complaint"] == case.complaint
+
+
+def test_no_pii_reaches_the_agents_or_the_log(temp_log):
+    complaint = ("You charged my card 4111 1111 1111 1111 twice for order ORD-1187. "
+                 "Call me on 9876543210 or email ravi.k@gmail.com")
+    case = type("C", (), dict(complaint=complaint, customer_name="Ravi", order_id="ORD-1187"))
+    result = asyncio.run(_run(case))
+    everything = "\n".join(m.to_text() for m in result.messages) + temp_log.read_text(encoding="utf-8-sig")
+    for secret in ("4111 1111 1111 1111", "9876543210", "ravi.k@gmail.com"):
+        assert secret not in everything
+    assert "[CARD ending 1111]" in everything

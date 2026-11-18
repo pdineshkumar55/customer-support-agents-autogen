@@ -8,6 +8,8 @@
    (OpenAI's free Moderation API).
 4. Field validation: the agents' answers (category, urgency, ...) must be allowed values.
 5. Rate limit: tickets per visitor and in total, to protect the OpenAI bill.
+6. PII masking: card numbers, phone numbers and email addresses in the customer's text are
+   replaced with placeholders before any model sees them and before the ticket is logged.
 
 Checks 1-4 only flag the ticket. The Log Agent's escalation rule then sends it to a human.
 """
@@ -165,3 +167,46 @@ def check_rate_limit(visitor: str) -> int:
             hits.append(now)
             _all_hits.append(now)
         return wait
+
+
+# ---------- 6. PII masking ----------
+# Card numbers: 13-19 digits, optionally grouped by spaces or dashes; must pass the Luhn check,
+# so order IDs, amounts and other long numbers are left alone. The last 4 digits are kept
+# (allowed by PCI DSS), so support can still tell which card the customer means.
+_CARD_RE = re.compile(r"(?<![\w-])\d(?:[ -]?\d){12,18}(?![\w-])")
+# Phones: Indian mobiles (10 digits starting 6-9, optional +91 / 0 prefix) and any
+# international number written with a leading "+".
+_PHONE_RE = re.compile(
+    r"(?<![\w+])(?:(?:\+91|0091|0)[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?![\w-])"
+    r"|(?<![\w+])\+\d{1,3}[\s-]?\d(?:[\s-]?\d){6,13}(?![\w-])"
+)
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+COMPANY_EMAIL_DOMAINS = ("shopnest.in",)  # our own addresses are not customer data
+
+
+def _luhn_ok(digits: str) -> bool:
+    total = 0
+    for i, d in enumerate(reversed(digits)):
+        n = int(d) * (2 if i % 2 else 1)
+        total += n - 9 if n > 9 else n
+    return total % 10 == 0
+
+
+def _mask_card(m: re.Match) -> str:
+    digits = re.sub(r"\D", "", m.group())
+    return f"[CARD ending {digits[-4:]}]" if _luhn_ok(digits) else m.group()
+
+
+def _mask_email(m: re.Match) -> str:
+    domain = m.group().rsplit("@", 1)[1].lower()
+    return m.group() if domain in COMPANY_EMAIL_DOMAINS else "[EMAIL]"
+
+
+def mask_pii(text: str) -> str:
+    """Replace card numbers, phone numbers and email addresses with placeholders.
+    Applied to the customer's text before any model sees it and before it is logged."""
+    if not text:
+        return text
+    text = _EMAIL_RE.sub(_mask_email, text)  # first, so digits inside an address stay put
+    text = _CARD_RE.sub(_mask_card, text)    # before phones: a card contains phone-like runs
+    return _PHONE_RE.sub("[PHONE]", text)

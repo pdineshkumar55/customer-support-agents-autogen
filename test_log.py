@@ -14,8 +14,9 @@ from pydantic import ValidationError
 from agents import log_agent
 from agents.log_agent import LogAgent, decide_escalation, log_ticket
 from agents.schemas import QueryAnalysis, Resolution
-from guardrails import SELF_HARM_REPLY
+from guardrails import SELF_HARM_REPLY, mask_pii
 from support_cases import CASE_PARAMS
+from team import build_task
 
 CLEAN = lambda complaint, reply: (set(), False)  # moderation stub: nothing harmful
 
@@ -185,3 +186,54 @@ def test_schema_rejects_values_outside_the_allowed_list(bad):
         QueryAnalysis(**{**good, **bad})
     with pytest.raises(ValidationError):
         Resolution(reply="Hi", confidence="high.")
+
+
+# ---------- PII masking ----------
+@pytest.mark.parametrize("text, expected", [
+    ("My card 4111 1111 1111 1111 was charged twice",
+     "My card [CARD ending 1111] was charged twice"),
+    ("cards 4111-1111-1111-1111 and 5500005555555559",
+     "cards [CARD ending 1111] and [CARD ending 5559]"),
+    ("Call 9876543210, +91 98765 43210 or 098765-43210",
+     "Call [PHONE], [PHONE] or [PHONE]"),
+    ("UK number +44 20 7946 0958", "UK number [PHONE]"),
+    ("Mail priya.k+shop@gmail.com or support@shopnest.in",
+     "Mail [EMAIL] or support@shopnest.in"),  # our own address is not customer data
+])
+def test_mask_pii(text, expected):
+    assert mask_pii(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "Order ORD-4512, paid ₹1,500 on 12/10/2026, refund ₹20,000 within 48 hours",
+    "Helpline 1800-123-4567 did not answer",
+    "Tracking number 1234567890123 is not working",   # long, but not a valid card number
+    "Order ID 8123456789012345",
+])
+def test_mask_pii_leaves_other_numbers_alone(text):
+    assert mask_pii(text) == text
+
+
+PII_COMPLAINT = ("You charged my card 4111 1111 1111 1111 twice. Call me on 9876543210 "
+                 "or email ravi.k@gmail.com")
+
+
+def test_build_task_masks_pii():
+    task = build_task(PII_COMPLAINT, "Ravi", "ORD-1187")
+    assert "4111 1111" not in task and "9876543210" not in task and "ravi.k@gmail.com" not in task
+    assert "[CARD ending 1111]" in task and "[PHONE]" in task and "[EMAIL]" in task
+    assert "ORD-1187" in task
+
+
+def test_log_ticket_masks_pii(temp_log, monkeypatch):
+    sent = []
+    monkeypatch.setattr(log_agent, "moderate", lambda c, r: sent.append(c) or (set(), False))
+    row = log_ticket(complaint=PII_COMPLAINT, category="Billing", urgency="High",
+                     sentiment="Angry", flags="payment_dispute", kb_sources="refund_policy.pdf",
+                     response="A billing specialist will review this.", confidence="Low",
+                     customer_name="Ravi", order_id="ORD-1187")
+    saved = temp_log.read_text(encoding="utf-8-sig")
+    for secret in ("4111 1111", "9876543210", "ravi.k@gmail.com"):
+        assert secret not in row["complaint"] and secret not in saved
+        assert secret not in sent[0]  # nor sent to the moderation API
+    assert "[CARD ending 1111]" in row["complaint"]

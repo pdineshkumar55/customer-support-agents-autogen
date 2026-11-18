@@ -16,8 +16,8 @@ from autogen_core import CancellationToken
 from pydantic import BaseModel
 
 from agents.schemas import QueryAnalysis, Resolution
-from guardrails import (SAFE_FALLBACK_REPLY, SELF_HARM_REPLY, injection_detected, moderate,
-                        normalise_field, unverified_numbers, valid_kb_sources)
+from guardrails import (SAFE_FALLBACK_REPLY, SELF_HARM_REPLY, injection_detected, mask_pii,
+                        moderate, normalise_field, unverified_numbers, valid_kb_sources)
 
 LOG_FILE = Path(__file__).resolve().parent.parent / "logs" / "tickets.csv"
 T = TypeVar("T", bound=BaseModel)
@@ -120,6 +120,9 @@ def log_ticket(
     """Save one support ticket to the log file and decide if it must be escalated
     to human support. Returns the saved row (ticket_id, status, escalation_reason, ...)."""
     # ---------- guardrails: checked in Python, so they can't be skipped ----------
+    # card numbers, phones and emails never reach the log file or the moderation API
+    complaint, customer_name, order_id = (mask_pii(complaint), mask_pii(customer_name),
+                                          mask_pii(order_id))
     flags = flags.strip() or "none"
 
     # the agents' answers must be allowed values ("high." is fixed to "High")
