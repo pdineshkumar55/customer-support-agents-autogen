@@ -14,6 +14,8 @@ Steps:
    Do NOT use a short list of keywords — full questions match the documents much better.
    ALWAYS write this question in English, even if the complaint is in another
    language — the company documents are in English.
+   Keep order IDs, acronyms and codes exactly as the customer wrote them (e.g. ORD-4512,
+   COD, AWB, OTP, NEFT, EMI): do not expand or translate them, the search matches them exactly.
 2. From the tool result, keep every passage that helps with this complaint, even if it
    only partly answers it. Copy them word for word.
    Never add facts that are not in the tool result.
