@@ -1,43 +1,43 @@
-"""Step 5 test: run complaints through the full 4-agent team."""
+"""End to end: each complaint through the full 4-agent team (real LLM calls).
+
+Checks the logged category and status. Urgency and sentiment are not asserted,
+because the model may reasonably vary there (e.g. Low vs Medium).
+Run: pytest test_team.py            (all 8, ~16 LLM calls)
+     pytest test_team.py -k charged (only case 5)
+     pytest -m "not llm"            (everything except this file)
+"""
 import asyncio
-import sys
 
 import pandas as pd
-from autogen_agentchat.ui import Console
+import pytest
+from autogen_agentchat.messages import TextMessage
 
-from agents.log_agent import LOG_FILE
 from llm import get_model_client
+from support_cases import CASE_PARAMS
 from team import build_task, create_team
 
-TEST_CASES = [
-    ("Priya", "ORD-4512", "Where is my order? It was supposed to arrive yesterday."),
-    ("Arjun", "ORD-3301", "I want to return the shoes I bought last week. How do I get a refund?"),
-    ("Meena", "", "I forgot my password and can't log in."),
-    ("Karthik", "ORD-2290", "The blender I received is broken. Can I get a replacement?"),
-    ("Ravi", "ORD-1187", "You charged my card three times! Fix this now or I'm contacting my bank and a lawyer."),
-    ("Divya", "", "Do you sell gift cards for a company of 500 employees with custom branding?"),
-]
+pytestmark = [pytest.mark.needs_openai, pytest.mark.llm]
 
 
-async def run_one(client, name, order_id, complaint):
-    team = create_team(client, complaint, name, order_id)  # fresh team = fresh memory for every ticket
-    result = await Console(team.run_stream(task=build_task(complaint, name, order_id)))
-    print(f"\n>>> Stopped because: {result.stop_reason}\n" + "#" * 80)
-
-
-async def main():
+async def _run(case):
     client = get_model_client()
-    # python test_team.py 3   -> runs only test case 3
-    cases = [TEST_CASES[int(sys.argv[1]) - 1]] if len(sys.argv) > 1 else TEST_CASES
-    for case in cases:
-        await run_one(client, *case)
-    await client.close()
-
-    pd.set_option("display.max_columns", None, "display.width", 200)
-    print(pd.read_csv(LOG_FILE)[["ticket_id", "customer_name", "category", "urgency",
-                                 "sentiment", "kb_sources", "confidence", "status",
-                                 "escalation_reason"]].fillna(""))
+    try:
+        team = create_team(client, case.complaint, case.customer_name, case.order_id)
+        return await team.run(task=build_task(case.complaint, case.customer_name, case.order_id))
+    finally:
+        await client.close()
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+@pytest.mark.parametrize("case", CASE_PARAMS)
+def test_team_handles_complaint(case, temp_log):
+    result = asyncio.run(_run(case))
+    last = result.messages[-1]
+    assert isinstance(last, TextMessage) and last.source == "log_agent", result.stop_reason
+    assert "LOGGED" in last.content
+
+
+    row = pd.read_csv(temp_log, encoding="utf-8-sig", keep_default_na=False).iloc[-1]
+    details = f"{row['category']} / {row['status']} ({row['escalation_reason']}) flags={row['flags']}"
+    assert row["category"] == case.category, details
+    assert row["status"] == case.status, details
+    assert row["complaint"] == case.complaint

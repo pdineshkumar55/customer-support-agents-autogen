@@ -187,14 +187,18 @@ streamlit run app.py
 
 The FAISS index is built automatically on the first search and saved to `faiss_index/`. It is rebuilt only when a PDF is added or changed.
 
-**Optional command-line tests:**
+**Tests (pytest):** the 6 brief complaints and our 2 own cases (`support_cases.py`) are checked for the expected category and status.
 
 ```bash
-python test_kb.py        # retrieval scores for the 6 test complaints
-python test_log.py       # escalation rule + guardrails + CSV (no LLM calls, only the free Moderation API; temp file)
-python test_team.py      # all 6 complaints through the full team
-python test_team.py 5    # just test case 5
+pip install -r requirements-dev.txt
+pytest test_log.py                  # escalation rule + guardrails + CSV (no LLM; temp log file)
+pytest test_kb.py                   # each complaint's best FAISS match is the right PDF (embeddings API)
+pytest test_team.py                 # all 8 complaints through the full team (real LLM calls)
+pytest test_team.py -k charged      # just test case 5
+pytest -m "not llm"                 # everything except the full-team run
 ```
+
+Tests that call OpenAI are skipped when `OPENAI_API_KEY` is not set. Nothing is written to `logs/tickets.csv`.
 
 ---
 
